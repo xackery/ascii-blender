@@ -12,10 +12,18 @@ from material_palette_parse import material_palette_parse
 from dmspritedef2_parse import dmspritedef2_parse
 from hierarchicalspritedef_parse import hierarchicalspritedef_parse
 from track_parse import track_parse
+from polyhedrondefinition_parse import polyhedrondefinition_parse
 
 def eq_ascii_parse(filepath):
     sections, includes = main_parse(filepath)
     
+    # Print out the sections for debugging
+    #print("\nSections:")
+    #for section, instances in sections.items():
+        #print(f"Section: {section}")
+        #for instance in instances:
+            #print("Instance:", instance)
+
     # Parse material palettes
     material_palettes = {}
     for instance in sections.get('MATERIALPALETTE', []):
@@ -33,16 +41,23 @@ def eq_ascii_parse(filepath):
     armature_data = None
     for instance in sections.get('HIERARCHICALSPRITEDEF', []):
         armature_data = hierarchicalspritedef_parse(instance)
+    
+    # Parse POLYHEDRONDEFINITION sections
+    polyhedrons = []
+    for instance in sections.get('POLYHEDRONDEFINITION', []):
+        print(f"Polyhedron Instance: {instance}")  # Debug print to check instance content
+        polyhedron = polyhedrondefinition_parse(instance)
+        polyhedrons.append(polyhedron)
 
     # Parse track definitions and instances
     track_definitions = track_parse(sections)
     
-    return meshes, armature_data, track_definitions, material_palettes, includes
+    return meshes, armature_data, track_definitions, material_palettes, includes, polyhedrons
 
 if __name__ == '__main__':
     # Example usage:
-    filepath = 'C:\\Users\\dariu\\Documents\\Quail\\rif.spk'
-    meshes, armature_data, track_definitions, material_palettes, include_files = eq_ascii_parse(filepath)
+    filepath = 'C:\\Users\\dariu\\Documents\\Quail\\pre.spk'
+    meshes, armature_data, track_definitions, material_palettes, include_files, polyhedrons = eq_ascii_parse(filepath)
 
     # Print out the includes
     print("Includes:")
@@ -64,3 +79,7 @@ if __name__ == '__main__':
 
     print("\nTRACKDEFINITION and TRACKINSTANCE Sections:")
     print(track_definitions)
+
+    print("\nPOLYHEDRONDEFINITION Sections:")
+    for polyhedron in polyhedrons:
+        print(polyhedron)
