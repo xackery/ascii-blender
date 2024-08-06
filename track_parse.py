@@ -120,15 +120,15 @@ def track_parse(sections):
     return {'animations': animations, 'armature_tracks': armature_tracks}
 
 # Example usage
-sections = {
-    'TRACKDEFINITION': [
+#sections = {
+    #'TRACKDEFINITION': [
         # Add track definition lines here
-    ],
-    'TRACKINSTANCE': [
+    #],
+    #'TRACKINSTANCE': [
         # Add track instance lines here
-    ]
-}
+   # ]
+#}
 
-track_data = track_parse(sections)
-print("Parsed track data:")
-print(track_data)
+#track_data = track_parse(sections)
+#print("Parsed track data:")
+#print(track_data)

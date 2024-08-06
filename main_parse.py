@@ -14,7 +14,9 @@ def main_parse(filepath):
         "TRACKDEFINITION": "ENDTRACKDEFINITION",
         "TRACKINSTANCE": "ENDTRACKINSTANCE",
         "HIERARCHICALSPRITEDEF": "ENDHIERARCHICALSPRITEDEF",
-        "POLYHEDRONDEFINITION": "ENDPOLYHEDRONDEFINITION"
+        "POLYHEDRONDEFINITION": "ENDPOLYHEDRONDEFINITION",
+        "SIMPLESPRITEDEF": "ENDSIMPLESPRITEDEF",
+        "MATERIALDEFINITION": "ENDMATERIALDEFINITION"  # Add MATERIALDEFINITION section
     }
 
     for line in lines:
@@ -55,6 +57,16 @@ def main_parse(filepath):
             sections[current_section].append([])
         elif line.startswith("POLYHEDRONDEFINITION"):
             current_section = "POLYHEDRONDEFINITION"
+            if current_section not in sections:
+                sections[current_section] = []
+            sections[current_section].append([])
+        elif line.startswith("SIMPLESPRITEDEF"):
+            current_section = "SIMPLESPRITEDEF"
+            if current_section not in sections:
+                sections[current_section] = []
+            sections[current_section].append([])
+        elif line.startswith("MATERIALDEFINITION"):  # Handle MATERIALDEFINITION
+            current_section = "MATERIALDEFINITION"
             if current_section not in sections:
                 sections[current_section] = []
             sections[current_section].append([])

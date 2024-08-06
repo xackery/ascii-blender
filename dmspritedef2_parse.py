@@ -254,10 +254,10 @@ def dmspritedef2_parse(lines):
     return mesh, dmsprite_sections
 
 # Example usage
-lines = [
+#lines = [
     # Add your test lines here for example usage
-]
+#]
 
-mesh, dmsprite_sections = dmspritedef2_parse(lines)
-print(mesh)
-print(dmsprite_sections)
+#mesh, dmsprite_sections = dmspritedef2_parse(lines)
+#print(mesh)
+#print(dmsprite_sections)

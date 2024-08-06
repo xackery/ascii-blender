@@ -120,10 +120,10 @@ def hierarchicalspritedef_parse(lines):
     return armature_data
 
 # Example usage
-lines = [
+#lines = [
     # Add your input lines here
-]
+#]
 
-armature_data = hierarchicalspritedef_parse(lines)
-print("HIERARCHICALSPRITEDEF Sections:")
-print(armature_data)
+#armature_data = hierarchicalspritedef_parse(lines)
+#print("HIERARCHICALSPRITEDEF Sections:")
+#print(armature_data)
