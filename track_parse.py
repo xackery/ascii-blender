@@ -1,5 +1,6 @@
+import bpy
 import re
-from calculations import euler_to_quaternion
+import mathutils
 
 # Define the list of animation prefixes
 animation_prefixes = [
@@ -26,33 +27,45 @@ def process_track_definition(lines, existing_track_definitions):
     track_def = {
         'name': '',
         'num_frames': 0,
-        'frame_transforms': [],
-        'location_denominator': None
+        'frame_transforms': []
     }
     
+    frame_transform = None
+
     for line in lines:
-        if line.startswith("TAG"):
+        if line.startswith("TAG") and not line.startswith("TAGINDEX"):
             base_name = line.split('"')[1]
             track_def['name'] = generate_unique_name(base_name, existing_track_definitions)
             existing_track_definitions.add(track_def['name'])
         elif line.startswith("NUMFRAMES"):
             track_def['num_frames'] = int(line.split()[1])
         elif line.startswith("FRAMETRANSFORM"):
-            parts = line.split()
-            loc_denom = float(parts[1])
-            z = int(parts[2])
-            y = int(parts[3])
-            x = int(parts[4])
-            tx = float(parts[5]) / loc_denom
-            ty = float(parts[6]) / loc_denom
-            tz = float(parts[7]) / loc_denom
-            rotation = euler_to_quaternion(x, y, z)
             frame_transform = {
-                'rotation': rotation,
-                'translation': (tx, ty, tz)
+                'translation': None,
+                'rotation': None
             }
-            track_def['frame_transforms'].append(frame_transform)
-            track_def['location_denominator'] = loc_denom
+        elif line.startswith("XYZSCALE"):
+            xyz_scale = float(line.split()[1])
+        elif line.startswith("XYZ"):
+            parts = line.split()
+            tx = float(parts[1]) / xyz_scale
+            ty = float(parts[2]) / xyz_scale
+            tz = float(parts[3]) / xyz_scale
+            frame_transform['translation'] = (tx, ty, tz)
+        elif line.startswith("ROTSCALE?"):
+            rot_scale = float(line.split()[1])
+        elif line.startswith("ROTABC?"):
+            parts = line.split()
+            rx = float(parts[1])
+            ry = float(parts[2])
+            rz = float(parts[3])
+            rotation = mathutils.Quaternion((rot_scale, rx, ry, rz))
+            rotation.normalize()
+            print(f"Quaternion: {rotation}")  # Print out the quaternion
+            frame_transform['rotation'] = rotation
+        elif line.startswith("ENDFRAMETRANSFORM"):
+            if frame_transform:
+                track_def['frame_transforms'].append(frame_transform)
 
     return track_def
 
@@ -65,11 +78,11 @@ def process_track_instance(lines, existing_track_instances, track_def_suffixes):
     }
     
     for line in lines:
-        if line.startswith("TAG"):
+        if line.startswith("TAG") and not line.startswith("TAGINDEX"):
             base_name = line.split('"')[1]
             track_instance['name'] = generate_unique_name(base_name, existing_track_instances)
             existing_track_instances.add(track_instance['name'])
-        elif line.startswith("DEFINITION"):
+        elif line.startswith("DEFINITION") and not line.startswith("DEFINITIONINDEX"):
             base_name = line.split('"')[1]
             if base_name in track_def_suffixes:
                 suffix = track_def_suffixes[base_name]
@@ -80,9 +93,9 @@ def process_track_instance(lines, existing_track_instances, track_def_suffixes):
                 track_instance['definition'] = base_name
                 track_def_suffixes[base_name] = 1
         elif line.startswith("INTERPOLATE"):
-            track_instance['interpolate'] = True
-        elif line.startswith("SLEEP"):
-            track_instance['sleep'] = int(line.split()[1])
+            track_instance['interpolate'] = bool(int(line.split()[1]))
+        elif line.startswith("SLEEP?"):
+            track_instance['sleep'] = int(line.split()[1]) if line.split()[1] != "NULL" else None
 
     return track_instance
 
@@ -119,16 +132,33 @@ def track_parse(sections):
 
     return {'animations': animations, 'armature_tracks': armature_tracks}
 
-# Example usage
-#sections = {
-    #'TRACKDEFINITION': [
-        # Add track definition lines here
-    #],
-    #'TRACKINSTANCE': [
-        # Add track instance lines here
-   # ]
-#}
+def build_animation(armature_obj, animations, frame_rate=30):
+    for anim_name, anim_data in animations.items():
+        track_instance = anim_data['instance']
+        track_definition = anim_data['definition']
+        num_frames = track_definition['num_frames']
 
-#track_data = track_parse(sections)
-#print("Parsed track data:")
-#print(track_data)
+        # Create a new action for the animation
+        action = bpy.data.actions.new(name=anim_name)
+        armature_obj.animation_data_create()
+        armature_obj.animation_data.action = action
+
+        # Build the animation
+        current_frame = 0
+        for i, frame_transform in enumerate(track_definition['frame_transforms']):
+            current_frame += (track_instance['sleep'] or 100) / 1000.0 * frame_rate
+            frame = round(current_frame)
+
+            for bone_name, bone in armature_obj.pose.bones.items():
+                if bone_name in track_instance['name']:
+                    bone.location = frame_transform['translation']
+                    bone.rotation_quaternion = frame_transform['rotation']
+                    bone.keyframe_insert(data_path="location", frame=frame)
+                    bone.keyframe_insert(data_path="rotation_quaternion", frame=frame)
+                    break
+
+        print(f"Animation '{anim_name}' created with {num_frames} frames.")
+
+# Example usage after parsing the sections:
+# track_data = track_parse(sections)
+# build_animation(armature_obj, track_data['animations'], frame_rate=30)

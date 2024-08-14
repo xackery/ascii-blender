@@ -12,19 +12,13 @@ if script_dir not in sys.path:
     sys.path.append(script_dir)
 
 # Import the modules
-from texture5ambientgouraud1 import create_node_group_t5ag1, create_material_with_node_group_t5ag1
-from userdefined_02 import create_node_group_ud02, create_material_with_node_group_ud02
-from userdefined_12 import create_node_group_ud12, create_material_with_node_group_ud12
-from userdefined_20 import create_node_group_ud20, create_material_with_node_group_ud20
-from userdefined_21 import create_node_group_ud21, create_material_with_node_group_ud21
-from userdefined_22 import create_node_group_ud22, create_material_with_node_group_ud22
-from userdefined_24 import create_node_group_ud24, create_material_with_node_group_ud24
 from eq_ascii_wld_parser import eq_ascii_parse
 from calculations import euler_to_quaternion
 from create_polyhedron import create_polyhedron
+from material_creator import create_materials  # Import the material creation function
 
 # Path to the text file
-file_path = r"C:\Users\dariu\Documents\Quail\rif.spk"
+file_path = r"C:\Users\dariu\Documents\Quail\chequip.quail\all.mod"
 
 # Get the base name for the main object
 base_name = os.path.splitext(os.path.basename(file_path))[0]
@@ -42,64 +36,15 @@ clear_console()
 # Read 3D data from file using eq_ascii_wld_parser
 meshes, armature_data, track_definitions, material_palettes, include_files, polyhedrons, textures, materials = eq_ascii_parse(file_path)
 
-# Dictionary to store created materials
-created_materials = {}
-
-# Dictionary to store created polyhedron objects
-polyhedron_objects = {}
-
 # Cache for node groups
 node_group_cache = {}
 
-# Create materials based on the parsed data
-for mat_data in materials:
-    mat_name = mat_data['name']
-    if mat_name not in created_materials:
-        texture_name = mat_data.get('texture_tag', '')
-        texture_file = textures.get(texture_name, "")
-        # Construct the full path to the texture file
-        texture_full_path = os.path.join(os.path.dirname(file_path), texture_file)
-        print(f"Creating material '{mat_name}' with texture '{texture_full_path}' and rendermethod '{mat_data['rendermethod']}'")
-        
-        rendermethod = mat_data['rendermethod']
-        if rendermethod == 'TEXTURE5AMBIENTGOURAUD1':
-            if 'TEXTURE5AMBIENTGOURAUD1' not in node_group_cache:
-                node_group_cache['TEXTURE5AMBIENTGOURAUD1'] = create_node_group_t5ag1()
-            mat = create_material_with_node_group_t5ag1(mat_name, texture_full_path, node_group_cache['TEXTURE5AMBIENTGOURAUD1'])
-        elif rendermethod == 'USERDEFINED 2':
-            if 'USERDEFINED 2' not in node_group_cache:
-                node_group_cache['USERDEFINED 2'] = create_node_group_ud02()
-            mat = create_material_with_node_group_ud02(mat_name, texture_full_path, node_group_cache['USERDEFINED 2'])
-        elif rendermethod == 'USERDEFINED 12':
-            if 'USERDEFINED 12' not in node_group_cache:
-                node_group_cache['USERDEFINED 12'] = create_node_group_ud12()
-            mat = create_material_with_node_group_ud12(mat_name, texture_full_path, node_group_cache['USERDEFINED 12'])
-        elif rendermethod == 'USERDEFINED 20':
-            if 'USERDEFINED 20' not in node_group_cache:
-                node_group_cache['USERDEFINED 20'] = create_node_group_ud20()
-            mat = create_material_with_node_group_ud20(mat_name, texture_full_path, node_group_cache['USERDEFINED 20'])
-        elif rendermethod == 'USERDEFINED 21':
-            if 'USERDEFINED 21' not in node_group_cache:
-                node_group_cache['USERDEFINED 21'] = create_node_group_ud21()
-            mat = create_material_with_node_group_ud21(mat_name, texture_full_path, node_group_cache['USERDEFINED 21'])
-        elif rendermethod == 'USERDEFINED 22':
-            if 'USERDEFINED 22' not in node_group_cache:
-                node_group_cache['USERDEFINED 22'] = create_node_group_ud22()
-            mat = create_material_with_node_group_ud22(mat_name, texture_full_path, node_group_cache['USERDEFINED 22'])                
-        elif rendermethod == 'USERDEFINED 24':
-            if 'USERDEFINED 24' not in node_group_cache:
-                node_group_cache['USERDEFINED 24'] = create_node_group_ud24()
-            mat = create_material_with_node_group_ud24(mat_name, texture_full_path, node_group_cache['USERDEFINED 24'])
-        else:
-            mat = bpy.data.materials.new(name=mat_name)
-            mat.use_nodes = True
-            principled_bsdf = mat.node_tree.nodes.get('Principled BSDF')
-            if principled_bsdf:
-                principled_bsdf.inputs['Base Color'].default_value = (1, 1, 1, 1)  # Set default color to white
-        
-        created_materials[mat_name] = mat
+# Create materials using the separate script
+created_materials = create_materials(materials, textures, file_path, node_group_cache)
 
 # Create polyhedron objects
+polyhedron_objects = {}
+
 for polyhedron_data in polyhedrons:
     polyhedron_obj = create_polyhedron(polyhedron_data)
     polyhedron_objects[polyhedron_data['name']] = polyhedron_obj
@@ -108,7 +53,6 @@ for polyhedron_data in polyhedrons:
 main_obj = bpy.data.objects.new(base_name, None)
 bpy.context.collection.objects.link(main_obj)
 
-# Function to create a mesh from given data and link to the main object
 def create_mesh(mesh_data, parent_obj, armature_obj=None, cumulative_matrices=None):
     print(f"Creating mesh '{mesh_data['name']}'")
 
@@ -128,11 +72,17 @@ def create_mesh(mesh_data, parent_obj, armature_obj=None, cumulative_matrices=No
     mesh.update()
 
     # == UV mapping ==
-    uvlayer = mesh.uv_layers.new(name=mesh_data['name'] + "_uv")
-    for i, triangle in enumerate(mesh.polygons):
-        vertices = list(triangle.vertices)
-        for j, vertex in enumerate(vertices):
-            uvlayer.data[triangle.loop_indices[j]].uv = (mesh_data['uvs'][vertex][0], mesh_data['uvs'][vertex][1] - 1)
+    if 'uvs' in mesh_data and mesh_data['uvs']:  # Check if UV data is present
+        uvlayer = mesh.uv_layers.new(name=mesh_data['name'] + "_uv")
+        for i, triangle in enumerate(mesh.polygons):
+            vertices = list(triangle.vertices)
+            for j, vertex in enumerate(vertices):
+                uvlayer.data[triangle.loop_indices[j]].uv = (mesh_data['uvs'][vertex][0], mesh_data['uvs'][vertex][1] - 1)
+
+    # == Apply Custom Normals ==
+    if 'normals' in mesh_data and len(mesh_data['normals']) == len(mesh_data['vertices']):
+        mesh.use_auto_smooth = True  # Enable auto smooth for custom normals
+        mesh.normals_split_custom_set_from_vertices(mesh_data['normals'])
 
     # Print global and local transforms before parenting to bone
     print(f"Mesh '{obj.name}' initial global location: {obj.matrix_world.translation}")
@@ -266,6 +216,11 @@ def create_armature(armature_data, armature_tracks, parent_obj):
             rotation = mathutils.Quaternion((transform['rotation'][0], transform['rotation'][1], transform['rotation'][2], transform['rotation'][3]))
             bone_bpy.matrix = mathutils.Matrix.Translation(transform['translation']) @ rotation.to_matrix().to_4x4()
             print(f"Bone '{bone_name}' initial rotation (Quaternion): {rotation}")
+            
+            # Print the translation values
+            print(f"Bone '{bone_name}' initial translation: {transform['translation']}")
+            print(f"Bone '{bone_name}' initial rotation (Quaternion): {rotation}")
+
         bone_map[index] = bone_bpy
 
     bpy.ops.object.mode_set(mode='EDIT')
@@ -290,7 +245,7 @@ def create_armature(armature_data, armature_tracks, parent_obj):
 
     bpy.ops.object.mode_set(mode='OBJECT')
 
-    preferred_children = ["AB_DAG", "CH_DAG", "NE_DAG", "HEAD_DAG", "HE_DAG", "CHEST01_DAG", "NECK01_DAG", "NECK02_DAG", "HEAD01_DAG", "HEAD_POINT_DAG", "HORSECHEST01_DAG"]
+    preferred_children = ["AB_DAG", "CH_DAG", "NE_DAG", "HEAD_DAG", "HE_DAG", "CHEST01_DAG", "NECK01_DAG", "NECK02_DAG", "HEAD01_DAG", "HEAD_POINT_DAG", "HORSECHEST01_DAG", "MID11_DAG"]
 
     # Set the tail of each bone to the head of its child bone
     bpy.ops.object.mode_set(mode='EDIT')
@@ -316,22 +271,122 @@ def create_armature(armature_data, armature_tracks, parent_obj):
             bone.tail = bone.head + mathutils.Vector((1, 0, 0))
     bpy.ops.object.mode_set(mode='OBJECT')
 
-    # Adjust origin by the center_offset value
-    center_offset = mathutils.Vector(armature_data.get('center_offset', [0.0, 0.0, 0.0]))
-    armature_obj.location = center_offset
+    # Adjust origin by the center_offset value only if it exists and is not NULL
+    center_offset_data = armature_data.get('center_offset')
+    if center_offset_data:
+        center_offset = mathutils.Vector(center_offset_data)
+        armature_obj.location = center_offset
+        print(f"Applied center_offset: {center_offset}")
+    else:
+        print("No valid center_offset found, using default location.")
 
     print("Final bone hierarchy:")
     for bone in armature.bones:
         print(f"Bone: {bone.name}, Parent: {bone.parent.name if bone.parent else 'None'}, Final rotation (Quaternion): {bone.matrix.to_quaternion()}")
+        print(f"Bone: {bone.name}, Final head location: {bone.head}")  # Print the final head location
 
     return armature_obj, bone_map, cumulative_matrices
+
+# Function to create and apply animations
+def create_animation(armature_obj, track_definitions, model_prefix=prefix):
+    # Group tracks by their animation key and model prefix
+    animations_by_key = {}
+    
+    for animation_name, animation_data in track_definitions['animations'].items():
+        # Extract the animation key (e.g., "C05")
+        animation_key = animation_name[:3]
+
+        # Use the correct action name
+        action_name = f"{animation_key}_{model_prefix}"
+
+        if action_name not in animations_by_key:
+            animations_by_key[action_name] = []
+        
+        animations_by_key[action_name].append(animation_data)
+
+    # Create actions for each animation key
+    for action_name, tracks in animations_by_key.items():
+        action = bpy.data.actions.new(name=action_name)
+        armature_obj.animation_data_create()
+        armature_obj.animation_data.action = action
+        
+        fcurves = {}  # Initialize the fcurves dictionary
+
+        # Go through each track in the animation data
+        for track_data in tracks:
+            track = track_data['definition']
+            track_instance_name = track_data['instance']['name']
+
+            # Debugging: Print bone name and track instance name
+            print(f"Checking bone '{track_instance_name}' against track instance '{track_instance_name}'")
+
+            # Identify which bone this track belongs to
+            for bone_name, bone in armature_obj.pose.bones.items():
+                # Strip '_DAG' from the bone name
+                stripped_bone_name = bone_name.replace('_DAG', '')
+
+                # Strip the animation prefix and '_TRACK' from the track instance name
+                stripped_track_instance_name = track_instance_name[3:].replace('_TRACK', '')
+
+                # Compare the stripped names
+                if stripped_bone_name == stripped_track_instance_name:
+                    # Initialize FCurves if they don't exist
+                    if bone_name not in fcurves:
+                        fcurves[bone_name] = {
+                            'location': [],
+                            'rotation_quaternion': []
+                        }
+
+                        # Get or create fcurves for location and rotation_quaternion
+                        for i in range(3):  # Location has 3 components: X, Y, Z
+                            fcurves[bone_name]['location'].append(action.fcurves.new(data_path=f'pose.bones["{bone_name}"].location', index=i))
+
+                        for i in range(4):  # Rotation quaternion has 4 components: W, X, Y, Z
+                            fcurves[bone_name]['rotation_quaternion'].append(action.fcurves.new(data_path=f'pose.bones["{bone_name}"].rotation_quaternion', index=i))
+
+                    # Insert keyframes for each frame
+                    for frame_index, frame in enumerate(track['frame_transforms']):
+                        # Debugging: Print the frame data
+                        print(f"Processing frame {frame_index + 1} for bone '{bone_name}' in animation '{action_name}':")
+                        print(f"  Translation: {frame.get('translation')}")
+                        print(f"  Rotation: {frame.get('rotation')}")
+
+                    # Extract translation and rotation
+                        location = frame.get('translation', [0, 0, 0])
+                        rotation = frame.get('rotation', [1, 0, 0, 0])  # Default quaternion
+
+                        # Insert location keyframes
+                        for i, value in enumerate(location):
+                            fcurve = fcurves[bone_name]['location'][i]
+                            kf = fcurve.keyframe_points.insert(frame_index + 1, value)
+                            kf.interpolation = 'LINEAR'
+
+                        # Insert rotation keyframes
+                        for i, value in enumerate(rotation):
+                            fcurve = fcurves[bone_name]['rotation_quaternion'][i]
+                            kf = fcurve.keyframe_points.insert(frame_index + 1, value)
+                            kf.interpolation = 'LINEAR'
+
+
+        # Debugging: Scan the created animation and count keyframes
+        print(f"Created animation '{action_name}' with {len(tracks)} tracks.")
+        total_keyframes = 0
+        for fcurve in action.fcurves:
+            num_keyframes = len(fcurve.keyframe_points)
+            total_keyframes += num_keyframes
+            print(f"FCurve for data path '{fcurve.data_path}', index {fcurve.array_index} has {num_keyframes} keyframes.")
+
+        print(f"Total keyframes in '{action_name}': {total_keyframes}\n")
 
 # Create armature and link it to the main object if armature data is available
 if armature_data and track_definitions:
     armature_tracks = track_definitions['armature_tracks']
     armature_obj, bone_map, cumulative_matrices = create_armature(armature_data, armature_tracks, main_obj)
+    
     for mesh_data in meshes:
         mesh_obj = create_mesh(mesh_data, main_obj, armature_obj, cumulative_matrices)
+    
+    create_animation(armature_obj, track_definitions)
 else:
     # If no armature data, just create meshes
     for mesh_data in meshes:
@@ -339,11 +394,21 @@ else:
 
 # Parent polyhedron to matching DMSPRITEDEF mesh
 for polyhedron_name, polyhedron_obj in polyhedron_objects.items():
+    actual_polyhedron_name = polyhedron_obj.name  # Access the actual Blender name of the polyhedron object
+    base_name = actual_polyhedron_name.split('.')[0]  # Get the base name without the suffix
+    appendix = actual_polyhedron_name.split('.')[-1] if '.' in actual_polyhedron_name else ''
+    
+    print(f"Polyhedron Name: '{actual_polyhedron_name}', Base Name: '{base_name}', Appendix: '{appendix}'")
+    
     for mesh_data in meshes:
-        if mesh_data.get('polyhedron') == polyhedron_name:
-            mesh_obj = bpy.data.objects.get(mesh_data['name'])
-            if polyhedron_obj:
+        if mesh_data.get('polyhedron') == base_name:
+            # Look for the mesh object with the same appendix
+            mesh_name_with_appendix = f"{mesh_data['name']}.{appendix}" if appendix else mesh_data['name']
+            mesh_obj = bpy.data.objects.get(mesh_name_with_appendix)
+            if mesh_obj:
+                print(f"Matching mesh found: {mesh_obj.name} for polyhedron: {actual_polyhedron_name}")
                 polyhedron_obj.parent = mesh_obj
+                break  # Stop searching once the correct parent is found
 
 print("Created object '{}' with {} meshes and armature '{}'".format(base_name, len(meshes), armature_data['name'] if armature_data else "None"))
 print("Included files:", include_files)  # Print the list of include files for reference

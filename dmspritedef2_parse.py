@@ -1,58 +1,54 @@
 import bpy
 import bmesh
-import math
 import mathutils
 import os
 import sys
 
 def process_skin_assignment_groups(data_string):
-    data_string = data_string.replace(' ,', ',')  # Remove extra spaces before commas
     parts = data_string.split()
     num_groups = int(parts[0])
-    group_data = ' '.join(parts[1:]).split(',')
+    group_data = parts[1:]  # Directly split without joining, assuming no commas
 
     vertex_groups = []
     vertex_start = 0
     for i in range(num_groups):
         num_vertices = int(group_data[i * 2].strip())
-        bone_index = int(group_data[i * 2 + 1].strip()) - 1  # Adjust bone index to be zero-based
-        vertex_end = vertex_start + num_vertices  
+        bone_index = int(group_data[i * 2 + 1].strip())  # Adjust bone index to be zero-based
+        vertex_end = vertex_start + num_vertices
         vertex_groups.append((vertex_start, vertex_end, bone_index))
-        vertex_start = vertex_end  
+        vertex_start = vertex_end
 
     return vertex_groups
 
 def process_face_material_groups(data_string):
-    data_string = data_string.replace(' ,', ',')  # Remove extra spaces before commas
     parts = data_string.split()
     num_groups = int(parts[0])
-    group_data = ' '.join(parts[1:]).split(',')
+    group_data = parts[1:]  # Directly split without joining, assuming no commas
 
     face_material_groups = []
     face_start = 0
     for i in range(num_groups):
         num_faces = int(group_data[i * 2].strip())
-        material_index = int(group_data[i * 2 + 1].strip()) - 1  # Adjust material index to be zero-based
-        face_end = face_start + num_faces  
+        material_index = int(group_data[i * 2 + 1].strip())  # Adjust material index to be zero-based
+        face_end = face_start + num_faces
         face_material_groups.append((face_start, face_end, material_index))
-        face_start = face_end  
+        face_start = face_end
 
     return face_material_groups
 
 def process_vertex_material_groups(data_string):
-    data_string = data_string.replace(' ,', ',')  # Remove extra spaces before commas
     parts = data_string.split()
     num_groups = int(parts[0])
-    group_data = ' '.join(parts[1:]).split(',')
+    group_data = parts[1:]  # Directly split without joining, assuming no commas
 
     vertex_material_groups = []
     vertex_start = 0
     for i in range(num_groups):
         num_vertices = int(group_data[i * 2].strip())
-        material_index = int(group_data[i * 2 + 1].strip()) - 1  # Adjust material index to be zero-based
-        vertex_end = vertex_start + num_vertices  
+        material_index = int(group_data[i * 2 + 1].strip())  # Adjust material index to be zero-based
+        vertex_end = vertex_start + num_vertices
         vertex_material_groups.append((vertex_start, vertex_end, material_index))
-        vertex_start = vertex_end  
+        vertex_start = vertex_end
 
     return vertex_material_groups
 
@@ -90,18 +86,19 @@ def dmspritedef2_parse(lines):
     polyhedron_data = []
     bounding_box_data = []
     keywords = [
-        "BOUNDINGBOX",
+        "BOUNDINGBOXMIN",
+        "BOUNDINGBOXMAX",
         "BOUNDINGRADIUS",
         "CENTEROFFSET",
         "DMTRACK",
         "FACEMATERIALGROUPS",
         "FPSCALE",
-        "MATERIALPALETTE", 
-        "NUMFACE2S", #TODO: Get correct syntax for faces (NUMFACE2S doesn't parse as ASCII)
+        "MATERIALPALETTE",
+        "NUMFACE2S",
         "NUMMESHOPS",
         "NUMUVS",
         "NUMVERTEXNORMALS",
-        "NUMRGBAS",
+        "NUMVERTEXCOLORS",
         "PARAMS2",
         "POLYHEDRON",
         "REGIONPOLYHEDRON",
@@ -128,7 +125,7 @@ def dmspritedef2_parse(lines):
             num_uvs = int(line.split()[1])
         elif line.startswith("UV") and num_uvs > 0:
             parts = line.split()
-            u = float(parts[1].strip(","))
+            u = float(parts[1])
             v = float(parts[2])
             uvs.append((u, v))
             num_uvs -= 1
@@ -137,7 +134,7 @@ def dmspritedef2_parse(lines):
         elif line.startswith("XYZ") and num_normals > 0:
             normals.append(list(map(float, line.split()[1:])))
             num_normals -= 1
-        elif line.startswith("NUMRGBAS"):
+        elif line.startswith("NUMVERTEXCOLORS"):
             num_colors = int(line.split()[1])
         elif line.startswith("RGBA") and num_colors > 0:
             parts = line.split()
@@ -149,20 +146,20 @@ def dmspritedef2_parse(lines):
             num_colors -= 1
         elif line.startswith("NUMFACE2S"):
             num_faces = int(line.split()[1])
-        elif line.startswith("DMFACE2") and num_faces > 0: #TODO: Get correct syntax for faces (DMFACE2 doesn't parse as ASCII)
+        elif line.startswith("DMFACE2") and num_faces > 0:
             face = []
             face_no_collision = False  # Reset the collision flag for each new face
         elif line.startswith("TRIANGLE"):
             parts = line.split()
-            v1 = int(parts[1].strip(",")) - 1
-            v2 = int(parts[2].strip(",")) - 1
-            v3 = int(parts[3]) - 1
+            v1 = int(parts[1].strip(","))  # 0-based now
+            v2 = int(parts[2].strip(","))  # 0-based now
+            v3 = int(parts[3])  # 0-based now
             current_face = (v3, v2, v1, face_no_collision)  # Add the no collision flag to the face tuple
             faces.append(current_face)
             num_faces -= 1
         elif line.startswith("PASSABLE"):
             face_no_collision = True  # Set the flag if the current face has no collision
-        elif line.startswith("ENDDMFACE2"): #TODO: Get correct syntax for faces (ENDDMFACE2 doesn't parse as ASCII)
+        elif line.startswith("ENDDMFACE2"):
             if current_face is not None:
                 faces[-1] = (faces[-1][0], faces[-1][1], faces[-1][2], face_no_collision)  # Update the last face with the no collision flag
         elif line.startswith("NUMMESHOPS"):
@@ -190,9 +187,14 @@ def dmspritedef2_parse(lines):
             mesh['material_palette'] = palette_name
         elif line.startswith("BOUNDINGRADIUS"):
             mesh['bounding_radius'] = float(line.split()[1])
-        elif line.startswith("BOUNDINGBOX"):
+        elif line.startswith("BOUNDINGBOXMIN"):
             current_section = "BOUNDINGBOX"
             bounding_box_data = []
+            bounding_box_data.append(list(map(float, line.split()[1:])))
+        elif line.startswith("BOUNDINGBOXMAX"):
+            bounding_box_data.append(list(map(float, line.split()[1:])))
+            mesh['bounding_box'] = bounding_box_data
+            current_section = None
         elif line.startswith("DMTRACK"):
             current_section = "DMTRACK"
             dmtrack_data = []
@@ -211,11 +213,6 @@ def dmspritedef2_parse(lines):
             mesh['has_regionpolyhedron'] = True
         elif line.startswith("PARAMS2"):
             mesh['params2'] = list(map(float, line.split()[1:]))
-        elif current_section == "BOUNDINGBOX" and line.startswith("XYZ"):
-            bounding_box_data.append(list(map(float, line.split()[1:])))
-            if len(bounding_box_data) == 2:  # Once we have both min and max points
-                mesh['bounding_box'] = bounding_box_data
-                current_section = None
         elif current_section and any(line.startswith(keyword) for keyword in keywords):
             current_section = None
             continue  # Re-process the current line by skipping the increment
@@ -252,12 +249,3 @@ def dmspritedef2_parse(lines):
     mesh['meshops'] = meshops
 
     return mesh, dmsprite_sections
-
-# Example usage
-#lines = [
-    # Add your test lines here for example usage
-#]
-
-#mesh, dmsprite_sections = dmspritedef2_parse(lines)
-#print(mesh)
-#print(dmsprite_sections)

@@ -1,4 +1,4 @@
-#Diffuse4
+#Transparent25
 
 import bpy
 import struct
@@ -14,33 +14,38 @@ def has_dds_header(texture_path):
     except IOError:
         return False
 
-def create_node_group_ud22():
+def create_node_group_ud10():
     # Create the node group
-    node_group = bpy.data.node_groups.new(name="USERDEFINED_22", type='ShaderNodeTree')
+    node_group = bpy.data.node_groups.new(name="USERDEFINED_10", type='ShaderNodeTree')
     
     # Add Group Input and Output nodes to the node group
     group_input = node_group.nodes.new('NodeGroupInput')
     group_input.location = (0, 0)
     group_output = node_group.nodes.new('NodeGroupOutput')
-    group_output.location = (400, 0)
+    group_output.location = (600, 0)
     node_group.inputs.new('NodeSocketColor', 'sRGB Texture')
     node_group.outputs.new('NodeSocketShader', 'Shader')
     
-    # Create a Diffuse BSDF node inside the node group
-    diffuse_node = node_group.nodes.new(type='ShaderNodeBsdfDiffuse')
-    diffuse_node.location = (200, 0)
+    # Create a Principled BSDF node inside the node group
+    principled_node = node_group.nodes.new(type='ShaderNodeBsdfPrincipled')
+    principled_node.location = (300, 0)
+    principled_node.inputs['Specular'].default_value = 0.0
+    principled_node.inputs['Alpha'].default_value = 0.75  # Set alpha to 0.75 for 25% transparency
 
     # Create links within the node group
     group_links = node_group.links
-    group_links.new(group_input.outputs['sRGB Texture'], diffuse_node.inputs['Color'])
-    group_links.new(diffuse_node.outputs['BSDF'], group_output.inputs['Shader'])
+    group_links.new(group_input.outputs['sRGB Texture'], principled_node.inputs['Base Color'])
+    group_links.new(principled_node.outputs['BSDF'], group_output.inputs['Shader'])
 
     return node_group
 
-def create_material_with_node_group_ud22(material_name, texture_path, node_group):
+def create_material_with_node_group_ud10(material_name, texture_path, node_group):
     # Create a new material
     material = bpy.data.materials.new(name=material_name)
     material.use_nodes = True
+    material.blend_method = 'BLEND'  # Set blend mode to Alpha Blend
+    material.use_backface_culling = True  # Enable backface culling
+
     nodes = material.node_tree.nodes
     links = material.node_tree.links
 

@@ -1,5 +1,18 @@
+#TransparentMasked
+
 import bpy
 import struct
+
+DDS_HEADER_SIZE = 128  # Size of DDS header
+DDS_MAGIC = b'DDS '  # The first 4 bytes of a DDS file should be "DDS "
+
+def has_dds_header(texture_path):
+    try:
+        with open(texture_path, 'rb') as f:
+            header = f.read(DDS_HEADER_SIZE)
+            return len(header) >= DDS_HEADER_SIZE and header[:4] == DDS_MAGIC
+    except IOError:
+        return False
 
 def read_bmp_palette_color(file_path):
     with open(file_path, 'rb') as f:
@@ -10,7 +23,7 @@ def read_bmp_palette_color(file_path):
 
 def create_node_group_ud20():
     # Create the node group
-    node_group = bpy.data.node_groups.new(name="USERDEFINED 20", type='ShaderNodeTree')
+    node_group = bpy.data.node_groups.new(name="USERDEFINED_20", type='ShaderNodeTree')
     
     # Add Group Input and Output nodes to the node group
     group_input = node_group.nodes.new('NodeGroupInput')
@@ -143,10 +156,32 @@ def create_material_with_node_group_ud20(material_name, image_texture_file, node
     rgb_node.location = (-300, 200)
     rgb_node.outputs[0].default_value = (red_value, green_value, blue_value, 1.0)
 
+    # Add a Texture Coordinate node
+    tex_coord_node = nodes.new(type='ShaderNodeTexCoord')
+    tex_coord_node.location = (-900, 0)
+
+    # Add a Mapping node
+    mapping_node1 = nodes.new(type='ShaderNodeMapping')
+    mapping_node1.location = (-600, -50)
+
+    mapping_node2 = nodes.new(type='ShaderNodeMapping')
+    mapping_node2.location = (-600, -400)
+    
+    # Flip the texture vertically if it has a DDS header
+    if has_dds_header(image_texture_file):
+        mapping_node1.inputs['Scale'].default_value[1] = -1  # Flip vertically
+        mapping_node2.inputs['Scale'].default_value[1] = -1  # Flip vertically
+
     material_output_node = nodes.new(type='ShaderNodeOutputMaterial')
     material_output_node.location = (300, 0)
 
     # Create links outside the group
+    links.new(tex_coord_node.outputs['UV'], mapping_node1.inputs['Vector'])
+    links.new(mapping_node1.outputs['Vector'], image_texture_node1.inputs['Vector'])
+
+    links.new(tex_coord_node.outputs['UV'], mapping_node2.inputs['Vector'])
+    links.new(mapping_node2.outputs['Vector'], image_texture_node2.inputs['Vector'])
+
     links.new(image_texture_node1.outputs['Color'], group_node.inputs['Non-Color Texture'])
     links.new(image_texture_node2.outputs['Color'], group_node.inputs['sRGB Texture'])
     links.new(rgb_node.outputs[0], group_node.inputs['Index 0 Color'])

@@ -19,10 +19,15 @@ def materialdefinition_parse(lines):
             }
         elif current_material is not None:
             if line.startswith("RENDERMETHOD"):
-                current_material['rendermethod'] = " ".join(line.split()[1:])
+                # Extract the method without the parentheses
+                current_material['rendermethod'] = line.split('"')[1]
             elif line.startswith("RGBPEN"):
                 parts = line.split()
-                current_material['rgbpen'] = (int(parts[1]) / 255.0, int(parts[2]) / 255.0, int(parts[3]) / 255.0)
+                current_material['rgbpen'] = (
+                    int(parts[1]) / 255.0,
+                    int(parts[2]) / 255.0,
+                    int(parts[3]) / 255.0
+                )
             elif line.startswith("BRIGHTNESS"):
                 current_material['brightness'] = float(line.split()[1])
             elif line.startswith("SCALEDAMBIENT"):
@@ -36,5 +41,5 @@ def materialdefinition_parse(lines):
 
     if current_material:
         materials.append(current_material)
-    
+
     return materials

@@ -1,8 +1,22 @@
+#TransparentAdditive
+
 import bpy
+import struct
+
+DDS_HEADER_SIZE = 128  # Size of DDS header
+DDS_MAGIC = b'DDS '  # The first 4 bytes of a DDS file should be "DDS "
+
+def has_dds_header(texture_path):
+    try:
+        with open(texture_path, 'rb') as f:
+            header = f.read(DDS_HEADER_SIZE)
+            return len(header) >= DDS_HEADER_SIZE and header[:4] == DDS_MAGIC
+    except IOError:
+        return False
 
 def create_node_group_ud24():
     # Create the node group
-    node_group = bpy.data.node_groups.new(name="USERDEFINED 24", type='ShaderNodeTree')
+    node_group = bpy.data.node_groups.new(name="USERDEFINED_24", type='ShaderNodeTree')
     
     # Add Group Input and Output nodes to the node group
     group_input = node_group.nodes.new('NodeGroupInput')
@@ -63,12 +77,28 @@ def create_material_with_node_group_ud24(material_name, texture_path, node_group
     image_texture_node.interpolation = 'Linear'
     image_texture_node.image.colorspace_settings.name = 'sRGB'
 
+    # Add a Texture Coordinate node
+    tex_coord_node = nodes.new(type='ShaderNodeTexCoord')
+    tex_coord_node.location = (-900, 0)
+
+    # Add a Mapping node
+    mapping_node = nodes.new(type='ShaderNodeMapping')
+    mapping_node.location = (-600, 0)
+    
+    # Flip the texture vertically if it has a DDS header
+    if has_dds_header(texture_path):
+        mapping_node.inputs['Scale'].default_value[1] = -1  # Flip vertically
+
+    # Create the necessary links
+    links.new(tex_coord_node.outputs['UV'], mapping_node.inputs['Vector'])
+    links.new(mapping_node.outputs['Vector'], image_texture_node.inputs['Vector'])
+    links.new(image_texture_node.outputs['Color'], group_node.inputs['sRGB Texture'])
+
     # Add a Material Output node
     material_output_node = nodes.new(type='ShaderNodeOutputMaterial')
     material_output_node.location = (300, 0)
 
-    # Create links outside the group
-    links.new(image_texture_node.outputs['Color'], group_node.inputs['sRGB Texture'])
+    # Create the final link
     links.new(group_node.outputs['Shader'], material_output_node.inputs['Surface'])
 
     return material
