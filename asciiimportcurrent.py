@@ -18,7 +18,7 @@ from create_polyhedron import create_polyhedron
 from material_creator import create_materials  # Import the material creation function
 
 # Path to the text file
-file_path = r"C:\Users\dariu\Documents\Quail\chequip.quail\all.mod"
+file_path = r"C:\Users\dariu\Documents\Quail\chequip.quail\zom.mod"
 
 # Get the base name for the main object
 base_name = os.path.splitext(os.path.basename(file_path))[0]
@@ -212,7 +212,7 @@ def create_armature(armature_data, armature_tracks, parent_obj):
             track_def = track_instance['definition']
             transform = track_def['frame_transforms'][0]  # Assuming the first frame for initial transform
             bone_bpy.head = transform['translation']
-            bone_bpy.tail = (transform['translation'][0], transform['translation'][1] + 1, transform['translation'][2])
+            bone_bpy.tail = (transform['translation'][0], transform['translation'][1] + .5, transform['translation'][2])
             rotation = mathutils.Quaternion((transform['rotation'][0], transform['rotation'][1], transform['rotation'][2], transform['rotation'][3]))
             bone_bpy.matrix = mathutils.Matrix.Translation(transform['translation']) @ rotation.to_matrix().to_4x4()
             print(f"Bone '{bone_name}' initial rotation (Quaternion): {rotation}")
@@ -241,35 +241,35 @@ def create_armature(armature_data, armature_tracks, parent_obj):
                 cumulative_matrices[child_bone.name] = child_bone.matrix
 
         if not parent_bone.children:
-            parent_bone.tail = parent_bone.head + mathutils.Vector((0, 1, 0))
+            parent_bone.tail = parent_bone.head + mathutils.Vector((0, .5, 0))
 
     bpy.ops.object.mode_set(mode='OBJECT')
 
     preferred_children = ["AB_DAG", "CH_DAG", "NE_DAG", "HEAD_DAG", "HE_DAG", "CHEST01_DAG", "NECK01_DAG", "NECK02_DAG", "HEAD01_DAG", "HEAD_POINT_DAG", "HORSECHEST01_DAG", "MID11_DAG"]
 
     # Set the tail of each bone to the head of its child bone
-    bpy.ops.object.mode_set(mode='EDIT')
-    for bone in armature.edit_bones:
-        if bone.children:
-            preferred_child = None
-            for child in bone.children:
-                child_name_no_prefix = child.name.replace(prefix, "")
-                if child_name_no_prefix in preferred_children:
-                    preferred_child = child
-                    break
-            if preferred_child:
-                if (bone.head - preferred_child.head).length < 0.001:
-                    bone.tail = bone.head + mathutils.Vector((0, 0.001, 0))
-                else:
-                    bone.tail = preferred_child.head
-            else:
-                if (bone.head - bone.children[0].head).length < 0.001:
-                    bone.tail = bone.head + mathutils.Vector((0, 0.001, 0))
-                else:
-                    bone.tail = bone.children[0].head
-        else:
-            bone.tail = bone.head + mathutils.Vector((1, 0, 0))
-    bpy.ops.object.mode_set(mode='OBJECT')
+#    bpy.ops.object.mode_set(mode='EDIT')
+#    for bone in armature.edit_bones:
+#        if bone.children:
+#            preferred_child = None
+#            for child in bone.children:
+#                child_name_no_prefix = child.name.replace(prefix, "")
+#                if child_name_no_prefix in preferred_children:
+#                    preferred_child = child
+#                    break
+#            if preferred_child:
+#                if (bone.head - preferred_child.head).length < 0.001:
+#                    bone.tail = bone.head + mathutils.Vector((0, 0.001, 0))
+#                else:
+#                    bone.tail = preferred_child.head
+#            else:
+#                if (bone.head - bone.children[0].head).length < 0.001:
+#                    bone.tail = bone.head + mathutils.Vector((0, 0.001, 0))
+#                else:
+#                    bone.tail = bone.children[0].head
+#        else:
+#            bone.tail = bone.head + mathutils.Vector((1, 0, 0))
+#    bpy.ops.object.mode_set(mode='OBJECT')
 
     # Adjust origin by the center_offset value only if it exists and is not NULL
     center_offset_data = armature_data.get('center_offset')
@@ -288,10 +288,10 @@ def create_armature(armature_data, armature_tracks, parent_obj):
     return armature_obj, bone_map, cumulative_matrices
 
 # Function to create and apply animations
-def create_animation(armature_obj, track_definitions, model_prefix=prefix):
+def create_animation(armature_obj, track_definitions, armature_data, model_prefix=prefix):
     # Group tracks by their animation key and model prefix
     animations_by_key = {}
-    
+
     for animation_name, animation_data in track_definitions['animations'].items():
         # Extract the animation key (e.g., "C05")
         animation_key = animation_name[:3]
@@ -344,6 +344,18 @@ def create_animation(armature_obj, track_definitions, model_prefix=prefix):
                         for i in range(4):  # Rotation quaternion has 4 components: W, X, Y, Z
                             fcurves[bone_name]['rotation_quaternion'].append(action.fcurves.new(data_path=f'pose.bones["{bone_name}"].rotation_quaternion', index=i))
 
+                    # Retrieve the initial translation and rotation from the armature creation data
+                    corresponding_bone = next((b for b in armature_data['bones'] if b['name'] == bone_name), None)
+                    if corresponding_bone:
+                        track_name = corresponding_bone['track']
+                        initial_transform = armature_tracks[track_name]['definition']['frame_transforms'][0]
+                        armature_translation = initial_transform.get('translation', [0, 0, 0])
+                        armature_rotation = initial_transform.get('rotation', Quaternion((1, 0, 0, 0)))
+
+                        # Debugging: Print the initial translation and rotation
+                        print(f"Bone '{bone_name}' initial translation from armature creation: {armature_translation}")
+                        print(f"Bone '{bone_name}' initial rotation from armature creation (Quaternion): {armature_rotation}")
+
                     # Insert keyframes for each frame
                     for frame_index, frame in enumerate(track['frame_transforms']):
                         # Debugging: Print the frame data
@@ -351,9 +363,12 @@ def create_animation(armature_obj, track_definitions, model_prefix=prefix):
                         print(f"  Translation: {frame.get('translation')}")
                         print(f"  Rotation: {frame.get('rotation')}")
 
-                    # Extract translation and rotation
-                        location = frame.get('translation', [0, 0, 0])
-                        rotation = frame.get('rotation', [1, 0, 0, 0])  # Default quaternion
+                        # Adjust the translation by subtracting the armature's initial translation
+                        location = [frame.get('translation', [0, 0, 0])[i] - armature_translation[i] for i in range(3)]
+
+                        # Adjust the rotation by multiplying with the conjugate of the initial armature rotation
+                        frame_rotation = Quaternion(frame.get('rotation', [1, 0, 0, 0]))
+                        adjusted_rotation = armature_rotation.conjugated() @ frame_rotation
 
                         # Insert location keyframes
                         for i, value in enumerate(location):
@@ -362,11 +377,10 @@ def create_animation(armature_obj, track_definitions, model_prefix=prefix):
                             kf.interpolation = 'LINEAR'
 
                         # Insert rotation keyframes
-                        for i, value in enumerate(rotation):
+                        for i, value in enumerate(adjusted_rotation):
                             fcurve = fcurves[bone_name]['rotation_quaternion'][i]
                             kf = fcurve.keyframe_points.insert(frame_index + 1, value)
                             kf.interpolation = 'LINEAR'
-
 
         # Debugging: Scan the created animation and count keyframes
         print(f"Created animation '{action_name}' with {len(tracks)} tracks.")
@@ -378,6 +392,7 @@ def create_animation(armature_obj, track_definitions, model_prefix=prefix):
 
         print(f"Total keyframes in '{action_name}': {total_keyframes}\n")
 
+
 # Create armature and link it to the main object if armature data is available
 if armature_data and track_definitions:
     armature_tracks = track_definitions['armature_tracks']
@@ -386,7 +401,8 @@ if armature_data and track_definitions:
     for mesh_data in meshes:
         mesh_obj = create_mesh(mesh_data, main_obj, armature_obj, cumulative_matrices)
     
-    create_animation(armature_obj, track_definitions)
+    # Pass armature_data to the create_animation function
+    create_animation(armature_obj, track_definitions, armature_data)
 else:
     # If no armature data, just create meshes
     for mesh_data in meshes:
