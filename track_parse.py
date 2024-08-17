@@ -12,6 +12,9 @@ animation_prefixes = [
     "S25", "S26", "S27", "S28", "P08", "O02", "O03"
 ]
 
+# Create a new list that includes the variants with "A" and "B"
+animation_prefix_variants = animation_prefixes + [prefix + "A" for prefix in animation_prefixes] + [prefix + "B" for prefix in animation_prefixes]
+
 def generate_unique_name(base_name, existing_names):
     if base_name not in existing_names:
         return base_name
@@ -61,7 +64,7 @@ def process_track_definition(lines, existing_track_definitions):
             rz = float(parts[3])
             rotation = mathutils.Quaternion((rot_scale, rx, ry, rz))
             rotation.normalize()
-            print(f"Quaternion: {rotation}")  # Print out the quaternion
+#            print(f"Quaternion: {rotation}")  # Print out the quaternion
             frame_transform['rotation'] = rotation
         elif line.startswith("ENDFRAMETRANSFORM"):
             if frame_transform:
@@ -99,7 +102,7 @@ def process_track_instance(lines, existing_track_instances, track_def_suffixes):
 
     return track_instance
 
-def track_parse(sections):
+def track_parse(sections, base_name):
     track_definitions = {}
     animations = {}
     armature_tracks = {}
@@ -119,16 +122,24 @@ def track_parse(sections):
         track_def = track_definitions.get(definition_name)
 
         if track_def:
-            if any(track_instance['name'].startswith(prefix) for prefix in animation_prefixes):
-                animations[track_instance['name']] = {
-                    'instance': track_instance,
-                    'definition': track_def
-                }
-            else:
-                armature_tracks[track_instance['name']] = {
-                    'instance': track_instance,
-                    'definition': track_def
-                }
+            # Extract the part before the base_name for comparison
+            if base_name in track_instance['name']:
+                prefix_part = track_instance['name'].split(base_name)[0]
+
+                # Perform an exact match with the animation prefix variants
+                if prefix_part in animation_prefix_variants:
+                    animations[track_instance['name']] = {
+                        'instance': track_instance,
+                        'definition': track_def,
+                        'animation_prefix': prefix_part  # Store the animation prefix
+                    }
+                    # Debugging: Ensure the prefix is stored correctly
+                    print(f"Stored animation prefix '{prefix_part}' for track '{track_instance['name']}'")
+                else:
+                    armature_tracks[track_instance['name']] = {
+                        'instance': track_instance,
+                        'definition': track_def
+                    }
 
     return {'animations': animations, 'armature_tracks': armature_tracks}
 
@@ -136,7 +147,11 @@ def build_animation(armature_obj, animations, frame_rate=30):
     for anim_name, anim_data in animations.items():
         track_instance = anim_data['instance']
         track_definition = anim_data['definition']
+        animation_prefix = anim_data.get('animation_prefix', 'Unknown')
         num_frames = track_definition['num_frames']
+
+        # Debugging: Print the animation prefix
+        print(f"Building animation '{anim_name}' with prefix '{animation_prefix}'")
 
         # Create a new action for the animation
         action = bpy.data.actions.new(name=anim_name)
@@ -160,5 +175,6 @@ def build_animation(armature_obj, animations, frame_rate=30):
         print(f"Animation '{anim_name}' created with {num_frames} frames.")
 
 # Example usage after parsing the sections:
-# track_data = track_parse(sections)
+# base_name = "FRO"  # Replace with the actual base name from your model
+# track_data = track_parse(sections, base_name)
 # build_animation(armature_obj, track_data['animations'], frame_rate=30)

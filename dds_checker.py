@@ -14,7 +14,7 @@ def check_and_fix_dds(texture_path):
         with open(texture_path, 'rb+') as f:
             header = f.read(DDS_HEADER_SIZE)
             if len(header) < DDS_HEADER_SIZE or header[:4] != DDS_MAGIC:
-                print(f"{texture_path} is not a valid DDS file or it's too small.")
+#                print(f"{texture_path} is not a valid DDS file or it's too small.")
                 return
             
             # Read the mip map count at offset 28
@@ -26,7 +26,7 @@ def check_and_fix_dds(texture_path):
             # Read the compression type at offset 84
             compression = header[DDS_OFFSET_COMPRESSION:DDS_OFFSET_COMPRESSION + 4]
             
-            print(f"Checking {texture_path} - Mip Map Count: {mip_map_count}, Flags: {hex(flags)}, Compression: {compression.decode('ascii')}")
+#            print(f"Checking {texture_path} - Mip Map Count: {mip_map_count}, Flags: {hex(flags)}, Compression: {compression.decode('ascii')}")
             
             if mip_map_count == 0 and (flags & DDSD_MIPMAPCOUNT) and compression == DXT1_COMPRESSION:
                 # If mip map count is 0, the mip map flag is set, and the compression is DXT1, turn off the mip map flag

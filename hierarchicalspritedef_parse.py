@@ -12,7 +12,7 @@ def process_dag_section(lines, bone_index, existing_bone_names, track_suffix_map
     line_index = 0
     while line_index < len(lines):
         line = lines[line_index].strip()
-        print(f"Processing DAG line: {line}")  # Debug print
+#        print(f"Processing DAG line: {line}")  # Debug print
 
         if line.startswith("TAG"):
             base_name = line.split('"')[1]
@@ -33,18 +33,18 @@ def process_dag_section(lines, bone_index, existing_bone_names, track_suffix_map
             sprite_value = line.split('"')[1]
             bone_data['sprite'] = sprite_value if sprite_value else None
         elif line.startswith("TRACK") and not line.startswith("TRACKINDEX"):
-            print(f"Found TRACK line: {line}")  # Debug print for TRACK line
+#            print(f"Found TRACK line: {line}")  # Debug print for TRACK line
             base_track = line.split('"')[1]
-            print(f"Extracted base_track: {base_track}")  # Debug print for extracted track
+#            print(f"Extracted base_track: {base_track}")  # Debug print for extracted track
             # Only append suffix if bone name was modified
             if bone_data['name'] != base_name:
                 suffix = track_suffix_map[base_name]
                 new_track = f"{base_track}.{suffix:03d}"
                 bone_data['track'] = new_track
-                print(f"Assigned new_track: {new_track}")  # Debug print for new track
+#                print(f"Assigned new_track: {new_track}")  # Debug print for new track
             else:
                 bone_data['track'] = base_track
-                print(f"Assigned base_track: {base_track}")  # Debug print for base track
+#                print(f"Assigned base_track: {base_track}")  # Debug print for base track
         elif line.startswith("TRACKINDEX"):
             bone_data['track_index'] = int(line.split()[1])
         elif line.startswith("SUBDAGLIST"):
@@ -82,7 +82,7 @@ def hierarchicalspritedef_parse(lines):
 
     while line_index < len(lines):
         line = lines[line_index].strip()
-        print(f"Parsing line: {line}")  # Debugging statement
+#        print(f"Parsing line: {line}")  # Debugging statement
 
         if line.startswith("TAG "):
             armature_data['name'] = line.split('"')[1]
@@ -116,12 +116,12 @@ def hierarchicalspritedef_parse(lines):
                 armature_data['center_offset'] = list(map(float, offset_values))
         elif line.startswith("DAGCOLLISIONS"):
             armature_data['dag_collisions'] = True
-            print(f"DAGCOLLISIONS set to True")  # Debugging statement
+#            print(f"DAGCOLLISIONS set to True")  # Debugging statement
         elif line.startswith("BOUNDINGRADIUS? "):
             bounding_radius_value = line.split()[1]
             if bounding_radius_value and bounding_radius_value != "NULL":
                 armature_data['bounding_radius'] = float(bounding_radius_value)
-            print(f"BOUNDINGRADIUS set to {armature_data['bounding_radius']}")  # Debugging statement
+#            print(f"BOUNDINGRADIUS set to {armature_data['bounding_radius']}")  # Debugging statement
         elif line.startswith("ENDHIERARCHICALSPRITEDEF"):
             break
 

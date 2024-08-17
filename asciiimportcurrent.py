@@ -85,10 +85,10 @@ def create_mesh(mesh_data, parent_obj, armature_obj=None, cumulative_matrices=No
         mesh.normals_split_custom_set_from_vertices(mesh_data['normals'])
 
     # Print global and local transforms before parenting to bone
-    print(f"Mesh '{obj.name}' initial global location: {obj.matrix_world.translation}")
-    print(f"Mesh '{obj.name}' initial global rotation (Quaternion): {obj.matrix_world.to_quaternion()}")
-    print(f"Mesh '{obj.name}' initial local location: {obj.location}")
-    print(f"Mesh '{obj.name}' initial local rotation (Quaternion): {obj.rotation_quaternion}")
+#    print(f"Mesh '{obj.name}' initial global location: {obj.matrix_world.translation}")
+#    print(f"Mesh '{obj.name}' initial global rotation (Quaternion): {obj.matrix_world.to_quaternion()}")
+#    print(f"Mesh '{obj.name}' initial local location: {obj.location}")
+#    print(f"Mesh '{obj.name}' initial local rotation (Quaternion): {obj.rotation_quaternion}")
 
     # Create vertex groups if armature data is available
     if armature_obj and cumulative_matrices:
@@ -109,8 +109,8 @@ def create_mesh(mesh_data, parent_obj, armature_obj=None, cumulative_matrices=No
                 if bone.get('sprite') == mesh_data['name']:
                     bone_obj = armature_obj.pose.bones.get(bone['name'])
                     if bone_obj:
-                        print(f"Bone '{bone_obj.name}' initial rotation (Quaternion): {track_definitions['armature_tracks'][bone['track']]['definition']['frame_transforms'][0]['rotation']}")
-                        print(f"Bone '{bone_obj.name}' final rotation (Quaternion): {bone_obj.matrix.to_quaternion()}")
+#                        print(f"Bone '{bone_obj.name}' initial rotation (Quaternion): {track_definitions['armature_tracks'][bone['track']]['definition']['frame_transforms'][0]['rotation']}")
+#                        print(f"Bone '{bone_obj.name}' final rotation (Quaternion): {bone_obj.matrix.to_quaternion()}")
                         q2 = Quaternion(track_definitions['armature_tracks'][bone['track']]['definition']['frame_transforms'][0]['rotation'])
                         q1 = bone_obj.matrix.to_quaternion()
                         q_r = q2 @ q1.conjugated()
@@ -176,10 +176,10 @@ def create_mesh(mesh_data, parent_obj, armature_obj=None, cumulative_matrices=No
                 print(f"Material index: {material_index}, Material name: Unknown")
 
     # Print global and local transforms after parenting to bone
-    print(f"Mesh '{obj.name}' final global location: {obj.matrix_world.translation}")
-    print(f"Mesh '{obj.name}' final global rotation (Quaternion): {obj.matrix_world.to_quaternion()}")
-    print(f"Mesh '{obj.name}' final local location: {obj.location}")
-    print(f"Mesh '{obj.name}' final local rotation (Quaternion): {obj.rotation_quaternion}")
+#    print(f"Mesh '{obj.name}' final global location: {obj.matrix_world.translation}")
+#    print(f"Mesh '{obj.name}' final global rotation (Quaternion): {obj.matrix_world.to_quaternion()}")
+#    print(f"Mesh '{obj.name}' final local location: {obj.location}")
+#    print(f"Mesh '{obj.name}' final local rotation (Quaternion): {obj.rotation_quaternion}")
 
     return obj
 
@@ -205,7 +205,7 @@ def create_armature(armature_data, armature_tracks, parent_obj):
     for index, bone in enumerate(armature_data['bones']):
         bone_name = bone['name']
         bone_bpy = armature.edit_bones.new(bone_name)
-        print(f"Created bone: {bone_name} at index {index}")
+#        print(f"Created bone: {bone_name} at index {index}")
 
         track_instance = armature_tracks.get(bone['track'], None)
         if track_instance:
@@ -215,11 +215,10 @@ def create_armature(armature_data, armature_tracks, parent_obj):
             bone_bpy.tail = (transform['translation'][0], transform['translation'][1] + .5, transform['translation'][2])
             rotation = mathutils.Quaternion((transform['rotation'][0], transform['rotation'][1], transform['rotation'][2], transform['rotation'][3]))
             bone_bpy.matrix = mathutils.Matrix.Translation(transform['translation']) @ rotation.to_matrix().to_4x4()
-            print(f"Bone '{bone_name}' initial rotation (Quaternion): {rotation}")
             
             # Print the translation values
-            print(f"Bone '{bone_name}' initial translation: {transform['translation']}")
-            print(f"Bone '{bone_name}' initial rotation (Quaternion): {rotation}")
+#            print(f"Bone '{bone_name}' initial translation: {transform['translation']}")
+#            print(f"Bone '{bone_name}' initial rotation (Quaternion): {rotation}")
 
         bone_map[index] = bone_bpy
 
@@ -280,10 +279,10 @@ def create_armature(armature_data, armature_tracks, parent_obj):
     else:
         print("No valid center_offset found, using default location.")
 
-    print("Final bone hierarchy:")
-    for bone in armature.bones:
-        print(f"Bone: {bone.name}, Parent: {bone.parent.name if bone.parent else 'None'}, Final rotation (Quaternion): {bone.matrix.to_quaternion()}")
-        print(f"Bone: {bone.name}, Final head location: {bone.head}")  # Print the final head location
+#    print("Final bone hierarchy:")
+#    for bone in armature.bones:
+#        print(f"Bone: {bone.name}, Parent: {bone.parent.name if bone.parent else 'None'}, Final rotation (Quaternion): {bone.matrix.to_quaternion()}")
+#        print(f"Bone: {bone.name}, Final head location: {bone.head}")  # Print the final head location
 
     return armature_obj, bone_map, cumulative_matrices
 
@@ -318,7 +317,7 @@ def create_animation(armature_obj, track_definitions, armature_data, model_prefi
             track_instance_name = track_data['instance']['name']
 
             # Debugging: Print bone name and track instance name
-            print(f"Checking bone '{track_instance_name}' against track instance '{track_instance_name}'")
+#            print(f"Checking bone '{track_instance_name}' against track instance '{track_instance_name}'")
 
             # Identify which bone this track belongs to
             for bone_name, bone in armature_obj.pose.bones.items():
@@ -353,15 +352,15 @@ def create_animation(armature_obj, track_definitions, armature_data, model_prefi
                         armature_rotation = initial_transform.get('rotation', Quaternion((1, 0, 0, 0)))
 
                         # Debugging: Print the initial translation and rotation
-                        print(f"Bone '{bone_name}' initial translation from armature creation: {armature_translation}")
-                        print(f"Bone '{bone_name}' initial rotation from armature creation (Quaternion): {armature_rotation}")
+#                        print(f"Bone '{bone_name}' initial translation from armature creation: {armature_translation}")
+#                        print(f"Bone '{bone_name}' initial rotation from armature creation (Quaternion): {armature_rotation}")
 
                     # Insert keyframes for each frame
                     for frame_index, frame in enumerate(track['frame_transforms']):
                         # Debugging: Print the frame data
-                        print(f"Processing frame {frame_index + 1} for bone '{bone_name}' in animation '{action_name}':")
-                        print(f"  Translation: {frame.get('translation')}")
-                        print(f"  Rotation: {frame.get('rotation')}")
+#                        print(f"Processing frame {frame_index + 1} for bone '{bone_name}' in animation '{action_name}':")
+#                        print(f"  Translation: {frame.get('translation')}")
+#                        print(f"  Rotation: {frame.get('rotation')}")
 
                         # Adjust the translation by subtracting the armature's initial translation
                         location = [frame.get('translation', [0, 0, 0])[i] - armature_translation[i] for i in range(3)]
@@ -383,14 +382,14 @@ def create_animation(armature_obj, track_definitions, armature_data, model_prefi
                             kf.interpolation = 'LINEAR'
 
         # Debugging: Scan the created animation and count keyframes
-        print(f"Created animation '{action_name}' with {len(tracks)} tracks.")
-        total_keyframes = 0
-        for fcurve in action.fcurves:
-            num_keyframes = len(fcurve.keyframe_points)
-            total_keyframes += num_keyframes
-            print(f"FCurve for data path '{fcurve.data_path}', index {fcurve.array_index} has {num_keyframes} keyframes.")
+#        print(f"Created animation '{action_name}' with {len(tracks)} tracks.")
+#        total_keyframes = 0
+#        for fcurve in action.fcurves:
+#            num_keyframes = len(fcurve.keyframe_points)
+#            total_keyframes += num_keyframes
+#            print(f"FCurve for data path '{fcurve.data_path}', index {fcurve.array_index} has {num_keyframes} keyframes.")
 
-        print(f"Total keyframes in '{action_name}': {total_keyframes}\n")
+#        print(f"Total keyframes in '{action_name}': {total_keyframes}\n")
 
 
 # Create armature and link it to the main object if armature data is available

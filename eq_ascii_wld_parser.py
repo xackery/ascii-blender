@@ -44,11 +44,11 @@ def eq_ascii_parse(filepath):
     parsed_sections, include_paths = recursive_parse(filepath)
 
     # Print out the sections for debugging
-    print("\nParsed Sections:")
-    for section, instances in parsed_sections.items():
-        print(f"Section: {section}")
-        for instance in instances:
-            print(f"Instance: {instance[:50]}...")  # Print first 50 chars of each instance for brevity
+#    print("\nParsed Sections:")
+#    for section, instances in parsed_sections.items():
+#        print(f"Section: {section}")
+#        for instance in instances:
+#            print(f"Instance: {instance}")  # Print the full content of each instance
 
     # Parse material palettes
     material_palettes = {}
@@ -71,26 +71,30 @@ def eq_ascii_parse(filepath):
     # Parse POLYHEDRONDEFINITION sections
     polyhedrons = []
     for instance in parsed_sections.get('POLYHEDRONDEFINITION', []):
-        print(f"Polyhedron Instance: {instance}")  # Debug print to check instance content
+#        print(f"Polyhedron Instance: {instance}")  # Debug print to check instance content
         polyhedron = polyhedrondefinition_parse(instance)
         polyhedrons.append(polyhedron)
 
     # Parse SIMPLESPRITEDEF sections
     textures = {}
     for instance in parsed_sections.get('SIMPLESPRITEDEF', []):
-        print(f"SIMPLESPRITEDEF Instance: {instance}")  # Debug print to check instance content
+#        print(f"SIMPLESPRITEDEF Instance: {instance}")  # Debug print to check instance content
         sprite_textures = simplespritedef_parse(instance)
         textures.update(sprite_textures)
 
     # Parse MATERIALDEFINITION sections
     materials = []
     for instance in parsed_sections.get('MATERIALDEFINITION', []):
-        print(f"MATERIALDEFINITION Instance: {instance}")  # Debug print to check instance content
+#        print(f"MATERIALDEFINITION Instance: {instance}")  # Debug print to check instance content
         material_defs = materialdefinition_parse(instance)
         materials.extend(material_defs)
 
+    # Get the base name for the main object
+    base_name = os.path.splitext(os.path.basename(filepath))[0]
+    base_name = base_name.upper()
+
     # Parse track definitions and instances
-    track_definitions = track_parse(parsed_sections)
+    track_definitions = track_parse(parsed_sections, base_name)
 
     return meshes, armature_data, track_definitions, material_palettes, include_paths, polyhedrons, textures, materials
 
@@ -99,35 +103,35 @@ if __name__ == '__main__':
     filepath = 'C:\\Users\\dariu\\Documents\\Quail\\pre.spk'
     meshes, armature_data, track_definitions, material_palettes, include_files, polyhedrons, textures, materials = eq_ascii_parse(filepath)
 
-    # Print out the includes
-    print("Includes:")
-    for include in include_files:
-        print(f"  {include}")
+#    # Print out the includes
+#    print("Includes:")
+#    for include in include_files:
+#        print(f"  {include}")
 
-    print("\nMaterial Palettes:")
-    for name, materials_list in material_palettes.items():
-        print(f"Palette: {name}")
-        for material in materials_list:
-            print(f"  Material: {material}")
+#    print("\nMaterial Palettes:")
+#    for name, materials_list in material_palettes.items():
+#        print(f"Palette: {name}")
+#        for material in materials_list:
+#            print(f"  Material: {material}")
 
-    print("\nDMSPRITEDEF2 Sections:")
-    for dmspritedef2 in meshes:
-        print(dmspritedef2)
-    
-    print("\nHIERARCHICALSPRITEDEF Sections:")
-    print(armature_data)
+#    print("\nDMSPRITEDEF2 Sections:")
+#    for dmspritedef2 in meshes:
+#        print(dmspritedef2)
+#    
+#    print("\nHIERARCHICALSPRITEDEF Sections:")
+#    print(armature_data)
 
     print("\nTRACKDEFINITION and TRACKINSTANCE Sections:")
     print(track_definitions)
 
-    print("\nPOLYHEDRONDEFINITION Sections:")
-    for polyhedron in polyhedrons:
-        print(polyhedron)
-    
-    print("\nSIMPLESPRITEDEF Textures:")
-    for name, path in textures.items():
-        print(f"Texture Name: {name}, File Path: {path}")
+#    print("\nPOLYHEDRONDEFINITION Sections:")
+#    for polyhedron in polyhedrons:
+#        print(polyhedron)
+#    
+#    print("\nSIMPLESPRITEDEF Textures:")
+#    for name, path in textures.items():
+#        print(f"Texture Name: {name}, File Path: {path}")
 
-    print("\nMATERIALDEFINITION Sections:")
-    for material in materials:
-        print(material)
+#    print("\nMATERIALDEFINITION Sections:")
+#    for material in materials:
+#        print(material)

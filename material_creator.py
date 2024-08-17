@@ -19,7 +19,7 @@ def create_materials(materials, textures, file_path, node_group_cache):
         mat_name = mat_data['name']
         # Check if the material already exists in the Blender file
         if mat_name in bpy.data.materials:
-            print(f"Material '{mat_name}' already exists. Using existing material.")
+#            print(f"Material '{mat_name}' already exists. Using existing material.")
             created_materials[mat_name] = bpy.data.materials[mat_name]
             continue
 
@@ -28,7 +28,7 @@ def create_materials(materials, textures, file_path, node_group_cache):
             texture_file = textures.get(texture_name, "")
             # Construct the full path to the texture file
             texture_full_path = os.path.join(os.path.dirname(file_path), texture_file)
-            print(f"Creating material '{mat_name}' with texture '{texture_full_path}' and rendermethod '{mat_data['rendermethod']}'")
+#            print(f"Creating material '{mat_name}' with texture '{texture_full_path}' and rendermethod '{mat_data['rendermethod']}'")
 
             rendermethod = mat_data['rendermethod']
             if rendermethod == 'TEXTURE5AMBIENTGOURAUD1':
