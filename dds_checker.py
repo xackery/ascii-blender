@@ -8,13 +8,13 @@ DDS_OFFSET_FLAGS = 8  # Offset for dwFlags
 DDSD_MIPMAPCOUNT = 0x20000  # The flag that indicates mip maps are present
 DDS_OFFSET_COMPRESSION = 84  # Offset for compression type
 DXT1_COMPRESSION = b'DXT1'  # DXT1 compression identifier
+DXT5_COMPRESSION = b'DXT5'  # DXT5 compression identifier
 
 def check_and_fix_dds(texture_path):
     try:
         with open(texture_path, 'rb+') as f:
             header = f.read(DDS_HEADER_SIZE)
             if len(header) < DDS_HEADER_SIZE or header[:4] != DDS_MAGIC:
-#                print(f"{texture_path} is not a valid DDS file or it's too small.")
                 return
             
             # Read the mip map count at offset 28
@@ -26,11 +26,9 @@ def check_and_fix_dds(texture_path):
             # Read the compression type at offset 84
             compression = header[DDS_OFFSET_COMPRESSION:DDS_OFFSET_COMPRESSION + 4]
             
-#            print(f"Checking {texture_path} - Mip Map Count: {mip_map_count}, Flags: {hex(flags)}, Compression: {compression.decode('ascii')}")
-            
-            if mip_map_count == 0 and (flags & DDSD_MIPMAPCOUNT) and compression == DXT1_COMPRESSION:
-                # If mip map count is 0, the mip map flag is set, and the compression is DXT1, turn off the mip map flag
-                print(f"Modifying {texture_path}: Turning off mip map flag.")
+            if mip_map_count == 0 and (flags & DDSD_MIPMAPCOUNT) and (compression == DXT1_COMPRESSION or compression == DXT5_COMPRESSION):
+                # If mip map count is 0, the mip map flag is set, and the compression is DXT1 or DXT5, turn off the mip map flag
+                print(f"Modifying {texture_path}: Turning off mip map flag for {compression.decode('ascii')}.")
                 flags &= ~DDSD_MIPMAPCOUNT
                 
                 # Write the modified flags back to the file

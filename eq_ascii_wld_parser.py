@@ -78,7 +78,7 @@ def eq_ascii_parse(filepath):
     # Parse SIMPLESPRITEDEF sections
     textures = {}
     for instance in parsed_sections.get('SIMPLESPRITEDEF', []):
-#        print(f"SIMPLESPRITEDEF Instance: {instance}")  # Debug print to check instance content
+        print(f"SIMPLESPRITEDEF Instance: {instance}")  # Debug print to check instance content
         sprite_textures = simplespritedef_parse(instance)
         textures.update(sprite_textures)
 
@@ -100,7 +100,7 @@ def eq_ascii_parse(filepath):
 
 if __name__ == '__main__':
     # Example usage:
-    filepath = 'C:\\Users\\dariu\\Documents\\Quail\\pre.spk'
+    filepath = r"C:\Users\dariu\Documents\Quail\crushbone.quail\r.mod"
     meshes, armature_data, track_definitions, material_palettes, include_files, polyhedrons, textures, materials = eq_ascii_parse(filepath)
 
 #    # Print out the includes
@@ -121,16 +121,16 @@ if __name__ == '__main__':
 #    print("\nHIERARCHICALSPRITEDEF Sections:")
 #    print(armature_data)
 
-    print("\nTRACKDEFINITION and TRACKINSTANCE Sections:")
-    print(track_definitions)
+#    print("\nTRACKDEFINITION and TRACKINSTANCE Sections:")
+#    print(track_definitions)
 
 #    print("\nPOLYHEDRONDEFINITION Sections:")
 #    for polyhedron in polyhedrons:
 #        print(polyhedron)
 #    
-#    print("\nSIMPLESPRITEDEF Textures:")
-#    for name, path in textures.items():
-#        print(f"Texture Name: {name}, File Path: {path}")
+    print("\nSIMPLESPRITEDEF Textures:")
+    for name, path in textures.items():
+        print(f"Texture Name: {name}, File Path: {path}")
 
 #    print("\nMATERIALDEFINITION Sections:")
 #    for material in materials:
