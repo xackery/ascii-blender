@@ -18,7 +18,7 @@ from create_polyhedron import create_polyhedron
 from material_creator import create_materials  # Import the material creation function
 
 # Path to the text file
-file_path = r"C:\Users\dariu\Documents\Quail\global6_chr.1.4.189.quail\ske.mod"
+file_path = r"C:\Users\dariu\Documents\Quail\globalelf_chr.quail\elf.mod"
 
 # Get the base name for the main object
 base_name = os.path.splitext(os.path.basename(file_path))[0]
@@ -292,8 +292,8 @@ def create_animation(armature_obj, track_definitions, armature_data, model_prefi
     animations_by_key = {}
 
     for animation_name, animation_data in track_definitions['animations'].items():
-        # Extract the animation key (e.g., "C05")
-        animation_key = animation_name[:3]
+        # Use the stored animation prefix instead of extracting it
+        animation_key = animation_data.get('animation_prefix', animation_name[:3])  # Fallback to old method if prefix isn't found
 
         # Use the correct action name
         action_name = f"{animation_key}_{model_prefix}"
@@ -325,7 +325,7 @@ def create_animation(armature_obj, track_definitions, armature_data, model_prefi
                 stripped_bone_name = bone_name.replace('_DAG', '')
 
                 # Strip the animation prefix and '_TRACK' from the track instance name
-                stripped_track_instance_name = track_instance_name[3:].replace('_TRACK', '')
+                stripped_track_instance_name = track_instance_name[len(animation_key):].replace('_TRACK', '')
 
                 # Compare the stripped names
                 if stripped_bone_name == stripped_track_instance_name:
