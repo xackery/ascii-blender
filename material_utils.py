@@ -35,9 +35,9 @@ def add_texture_coordinate_and_mapping_nodes(nodes, links, image_texture_node, t
     :param links: Links of the node tree.
     :param image_texture_node: The image texture node to connect.
     :param texture_path: The path to the texture file.
-    :return: None
+    :return: Tuple of (tex_coord_node, mapping_node)
     """
-    
+
     # Calculate positions relative to the Image Texture node
     tex_coord_location = (image_texture_node.location.x - 600, image_texture_node.location.y)
     mapping_location = (image_texture_node.location.x - 300, image_texture_node.location.y)
@@ -57,6 +57,9 @@ def add_texture_coordinate_and_mapping_nodes(nodes, links, image_texture_node, t
     # Connect nodes
     links.new(tex_coord_node.outputs['UV'], mapping_node.inputs['Vector'])
     links.new(mapping_node.outputs['Vector'], image_texture_node.inputs['Vector'])
+
+    # Return the created nodes
+    return tex_coord_node, mapping_node
     
 def apply_detail_mapping(mapping_node, detail_value, has_dds_header):
     """

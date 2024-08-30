@@ -104,8 +104,11 @@ def create_materials(materials, textures, file_path, node_group_cache):
             
             # Check for layered textures
             for frame in texture_info.get('frames', []):
-                if frame.get('type') == 'layer':
-                    add_layered_texture_nodes(mat, frame, rendermethod, node_group_cache)
+                frame_type = frame.get('type', '').lower()
+                print(f"Processing frame type: {frame_type} for material: {mat.name}")
+                if frame_type == 'layer':
+                    print(f"Adding layered texture nodes to material: {mat.name}")
+                    add_layered_texture_nodes(mat, texture_info, node_group_cache, base_path=os.path.dirname(file_path))
                 elif frame.get('type') == 'detail':
                     add_detail_texture_nodes(mat, frame, node_group_cache)
                 elif frame.get('type') == 'palette_mask':
@@ -254,16 +257,19 @@ def add_animated_texture_nodes(material, texture_info, base_path=None):
         material[frame_name] = frame_file
 
     print(f"Added animated texture nodes to material: {material.name}")
-    pass
 
-def add_layered_texture_nodes(material, texture_info, node_group_cache):
+def add_layered_texture_nodes(material, texture_info, node_group_cache, base_path=None):
     """
     Adds layered texture nodes to a material.
 
     :param material: The material to modify.
     :param texture_info: A dictionary containing texture information, including layering details.
     :param node_group_cache: A cache to store and retrieve existing node groups.
+    :param base_path: The base path where texture files are located.
     """
+    print(f"add_layered_texture_nodes called for material: {material.name}")
+    print(f"Texture info: {texture_info}")
+
     nodes = material.node_tree.nodes
     links = material.node_tree.links
 
@@ -285,15 +291,37 @@ def add_layered_texture_nodes(material, texture_info, node_group_cache):
             layer_file_name = os.path.basename(frame_file)
             layer_name = f"{layer_file_name}_LAYER"
 
+            # Construct full path to the file
+            full_path = os.path.join(base_path, frame_file) if base_path else frame_file
+            texture_path = bpy.path.abspath(full_path)
+
+            print(f"Loading image file: {texture_path}")
+
+            try:
+                # Attempt to load the image
+                image = bpy.data.images.load(texture_path)
+            except Exception as e:
+                print(f"Error loading image file: {texture_path}: {e}")
+                continue
+
             # Add Image Texture node for the layer
             image_texture_node = nodes.new(type='ShaderNodeTexImage')
             image_texture_node.location = (-600, 200)
-            image_texture_node.image = bpy.data.images.load(frame_file)
+            image_texture_node.image = image
             image_texture_node.name = layer_name
             image_texture_node.label = layer_name
 
             # Add Texture Coordinate and Mapping nodes for the new image texture
-            tex_coord_node, mapping_node = add_texture_coordinate_and_mapping_nodes(nodes, links, image_texture_node, frame_file)
+            result = add_texture_coordinate_and_mapping_nodes(nodes, links, image_texture_node, texture_path)
+            if result:
+                tex_coord_node, mapping_node = result
+                
+                # Ensure the Y axis is flipped for DDS textures
+                if has_dds_header(texture_path):
+                    mapping_node.inputs['Scale'].default_value[1] = -1
+            else:
+                print(f"Failed to add texture coordinate and mapping nodes for {frame_file}")
+                continue
 
             # Create another rendermethod node group for the layer
             layer_node_group = nodes.new(type='ShaderNodeGroup')
@@ -317,14 +345,13 @@ def add_layered_texture_nodes(material, texture_info, node_group_cache):
             links.new(image_texture_node.outputs['Alpha'], mix_shader_node.inputs['Fac'])
 
             # Update the output connection to go through the Mix Shader
-            for link in links:
-                if link.to_node == material.node_tree.nodes.get('Material Output'):
-                    links.new(mix_shader_node.outputs[0], link.to_socket)
-                    break
+            material_output_node = material.node_tree.nodes.get('Material Output')
+            if material_output_node:
+                links.new(mix_shader_node.outputs[0], material_output_node.inputs['Surface'])
+                print(f"Connected mix shader output to material output for {material.name}")
 
     print(f"Added layered texture nodes to material: {material.name}")
-    pass
-
+    
 def add_detail_texture_nodes(material, texture_info, node_group_cache):
     """
     Adds detail texture nodes to a material.
@@ -397,7 +424,6 @@ def add_detail_texture_nodes(material, texture_info, node_group_cache):
                     break
 
     print(f"Added detail texture nodes to material: {material.name}")
-    pass
 
 def add_palette_mask_texture_nodes(material, texture_info, node_group_cache):
     """
@@ -488,7 +514,6 @@ def create_blur_node_group(blur_node_group):
     links.new(add_vector_node.outputs['Vector'], group_output.inputs['Vector'])
 
     print("Created Blur node group")
-    pass
 
 def add_tiled_texture_nodes(material, texture_info, node_group_cache):
     """
@@ -729,4 +754,3 @@ def create_palette_mask_node_group(palette_mask_node_group):
     links.new(mix_shader.outputs['Shader'], group_output.inputs['Shader'])
 
     print("Created PaletteMask node group")
-    pass
