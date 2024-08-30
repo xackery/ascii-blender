@@ -57,3 +57,19 @@ def add_texture_coordinate_and_mapping_nodes(nodes, links, image_texture_node, t
     # Connect nodes
     links.new(tex_coord_node.outputs['UV'], mapping_node.inputs['Vector'])
     links.new(mapping_node.outputs['Vector'], image_texture_node.inputs['Vector'])
+    
+def apply_detail_mapping(mapping_node, detail_value, has_dds_header):
+    """
+    Applies detail mapping scale to a mapping node.
+
+    :param mapping_node: The mapping node to adjust.
+    :param detail_value: The scale value to apply for detail mapping.
+    :param has_dds_header: Boolean indicating if the texture has a DDS header.
+    """
+    # Apply the detail_value to X scale
+    mapping_node.inputs['Scale'].default_value[0] = detail_value
+
+    # Apply the detail_value to Y scale, negate if texture has a DDS header
+    mapping_node.inputs['Scale'].default_value[1] = -detail_value if has_dds_header else detail_value
+
+    print(f"Applied detail mapping: X scale = {detail_value}, Y scale = {'-' if has_dds_header else ''}{detail_value}")

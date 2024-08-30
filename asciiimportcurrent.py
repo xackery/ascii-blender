@@ -18,7 +18,7 @@ from create_polyhedron import create_polyhedron
 from material_creator import create_materials  # Import the material creation function
 
 # Path to the text file
-file_path = r"C:\Users\dariu\Documents\Quail\twilight.original.quail\r.mod"
+file_path = r"C:\Users\dariu\Documents\Quail\twilight.quail\r.mod"
 
 # Get the base name for the main object
 base_name = os.path.splitext(os.path.basename(file_path))[0]
