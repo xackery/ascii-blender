@@ -1,5 +1,6 @@
 import bpy
 import os
+from material_utils import has_dds_header, add_texture_coordinate_and_mapping_nodes
 from texture5ambientgouraud1 import create_node_group_t5ag1, create_material_with_node_group_t5ag1
 from transparent import create_node_group_transparent, create_material_with_node_group_transparent
 from userdefined_02 import create_node_group_ud02, create_material_with_node_group_ud02

@@ -1,18 +1,7 @@
 #Transparent25
 
 import bpy
-import struct
-
-DDS_HEADER_SIZE = 128  # Size of DDS header
-DDS_MAGIC = b'DDS '  # The first 4 bytes of a DDS file should be "DDS "
-
-def has_dds_header(texture_path):
-    try:
-        with open(texture_path, 'rb') as f:
-            header = f.read(DDS_HEADER_SIZE)
-            return len(header) >= DDS_HEADER_SIZE and header[:4] == DDS_MAGIC
-    except IOError:
-        return False
+from material_utils import has_dds_header, add_texture_coordinate_and_mapping_nodes
 
 def create_node_group_ud10():
     # Create the node group
@@ -65,21 +54,10 @@ def create_material_with_node_group_ud10(material_name, texture_path, node_group
     image_texture_node.interpolation = 'Linear'
     image_texture_node.image.colorspace_settings.name = 'sRGB'
 
-    # Add a Texture Coordinate node
-    tex_coord_node = nodes.new(type='ShaderNodeTexCoord')
-    tex_coord_node.location = (-900, 0)
-
-    # Add a Mapping node
-    mapping_node = nodes.new(type='ShaderNodeMapping')
-    mapping_node.location = (-600, 0)
-    
-    # Flip the texture vertically if it has a DDS header
-    if has_dds_header(texture_path):
-        mapping_node.inputs['Scale'].default_value[1] = -1  # Flip vertically
+    # Add nodes to flip dds files
+    add_texture_coordinate_and_mapping_nodes(nodes, links, image_texture_node, texture_path)
 
     # Create the necessary links
-    links.new(tex_coord_node.outputs['UV'], mapping_node.inputs['Vector'])
-    links.new(mapping_node.outputs['Vector'], image_texture_node.inputs['Vector'])
     links.new(image_texture_node.outputs['Color'], group_node.inputs['sRGB Texture'])
 
     # Add a Material Output node
