@@ -1,7 +1,7 @@
 import bpy
 import os
 import shutil
-from material_utils import has_dds_header, add_texture_coordinate_and_mapping_nodes, apply_detail_mapping
+from material_utils import has_dds_header, add_texture_coordinate_and_mapping_nodes, apply_detail_mapping, apply_tiled_mapping
 from texture5ambientgouraud1 import create_node_group_t5ag1, create_material_with_node_group_t5ag1
 from transparent import create_node_group_transparent, create_material_with_node_group_transparent
 from userdefined_02 import create_node_group_ud02, create_material_with_node_group_ud02
@@ -111,10 +111,10 @@ def create_materials(materials, textures, file_path, node_group_cache):
                     add_layered_texture_nodes(mat, texture_info, node_group_cache, base_path=os.path.dirname(file_path))
                 elif frame_type == 'detail':
                     add_detail_texture_nodes(mat, texture_info, node_group_cache, base_path=os.path.dirname(file_path))
-                elif frame.get('type') == 'palette_mask':
-                    add_palette_mask_texture_nodes(mat, frame, node_group_cache)
-                elif frame.get('type') == 'tiled':
-                    add_tiled_texture_nodes(mat, frame, node_group_cache)
+                elif frame_type == 'palette_mask':
+                    add_palette_mask_texture_nodes(mat, texture_info, node_group_cache, base_path=os.path.dirname(file_path))
+                elif frame_type == 'tiled':
+                    add_tiled_texture_nodes(mat, texture_info, node_group_cache, base_path=os.path.dirname(file_path))
             
             created_materials[mat_name] = mat
 
@@ -463,13 +463,14 @@ def add_detail_texture_nodes(material, texture_info, node_group_cache, base_path
 
     print(f"Added detail texture nodes to material: {material.name}")
 
-def add_palette_mask_texture_nodes(material, texture_info, node_group_cache):
+def add_palette_mask_texture_nodes(material, texture_info, node_group_cache, base_path=None):
     """
     Adds palette mask texture nodes to a material.
 
     :param material: The material to modify.
     :param texture_info: A dictionary containing texture information, including palette mask frames.
     :param node_group_cache: A cache to store and retrieve existing node groups.
+    :param base_path: The base path where texture files are located.
     """
     nodes = material.node_tree.nodes
     links = material.node_tree.links
@@ -482,23 +483,37 @@ def add_palette_mask_texture_nodes(material, texture_info, node_group_cache):
     else:
         blur_node_group = bpy.data.node_groups[blur_node_group_name]
 
+    blur_node = nodes.new(type='ShaderNodeGroup')
+    blur_node.node_tree = blur_node_group
+    blur_node.location = (-600, -200)
+
     # Process palette mask frames
     for frame_data in texture_info.get('frames', []):
         if frame_data.get('type') == 'palette_mask':
             frame_file = frame_data['file']
 
-            # Add Image Texture node for the palette mask
-            palette_mask_texture_node = nodes.new(type='ShaderNodeTexImage')
-            palette_mask_texture_node.location = (-400, -200)
-            palette_mask_texture_node.image = bpy.data.images.load(frame_file)
-            palette_mask_texture_node.image.colorspace_settings.name = 'Non-Color'
+            # Construct full path to the file
+            full_path = os.path.join(base_path, frame_file) if base_path else frame_file
+            texture_path = bpy.path.abspath(full_path)
 
-            # Connect the Blur node group to the palette mask texture
-            blur_node = nodes.new(type='ShaderNodeGroup')
-            blur_node.node_tree = blur_node_group
-            blur_node.location = (-600, -200)
+            # Check if the file exists before loading
+            if not os.path.isfile(texture_path):
+                print(f"Warning: Palette mask texture file not found: {texture_path}")
+                continue
 
-            links.new(blur_node.outputs[0], palette_mask_texture_node.inputs['Vector'])
+            try:
+                # Add Image Texture node for the palette mask
+                palette_mask_texture_node = nodes.new(type='ShaderNodeTexImage')
+                palette_mask_texture_node.location = (-400, -200)
+                palette_mask_texture_node.image = bpy.data.images.load(texture_path)
+                palette_mask_texture_node.image.colorspace_settings.name = 'Non-Color'
+
+                # Connect the Blur node group to the palette mask texture
+                links.new(blur_node.outputs[0], palette_mask_texture_node.inputs['Vector'])
+
+            except RuntimeError as e:
+                print(f"Error loading palette mask texture file: {texture_path}: {e}")
+                continue
 
             # Store the palette mask node for future use in tiled textures
             texture_info['palette_mask_node'] = palette_mask_texture_node
@@ -526,40 +541,51 @@ def create_blur_node_group(blur_node_group):
     add_vector_node.location = (0, 0)
 
     noise_texture_node = nodes.new(type='ShaderNodeTexWhiteNoise')
-    noise_texture_node.location = (-400, 0)
+    noise_texture_node.location = (-400, -100)
 
     map_range_node = nodes.new(type='ShaderNodeMapRange')
     map_range_node.data_type = 'FLOAT_VECTOR'  # Updated data type to 'FLOAT_VECTOR'
-    map_range_node.location = (-200, 0)
+    map_range_node.location = (-200, -100)
 
     value_node = nodes.new(type='ShaderNodeValue')
-    value_node.location = (-800, 0)
+    value_node.location = (-800, -500)
     value_node.outputs[0].default_value = 0.005
 
     multiply_node = nodes.new(type='ShaderNodeMath')
     multiply_node.operation = 'MULTIPLY'
-    multiply_node.location = (-600, -200)
+    multiply_node.location = (-600, -300)
     multiply_node.inputs[1].default_value = -1
 
     # Create links within the Blur node group
+
+    # Connect TexCoord and Noise Texture
     links.new(tex_coord_node.outputs['UV'], add_vector_node.inputs[0])
     links.new(tex_coord_node.outputs['UV'], noise_texture_node.inputs['Vector'])
-    links.new(noise_texture_node.outputs['Color'], map_range_node.inputs['Value'])  # Changed 'Vector' to 'Value'
-    links.new(value_node.outputs[0], map_range_node.inputs['To Max'])
+    links.new(noise_texture_node.outputs['Color'], map_range_node.inputs['Vector'])  
+
+    # Correctly get the 'From Max' and 'From Min' sockets for the vector type
+    to_max_vector_input = next(s for s in map_range_node.inputs if s.name == 'To Max' and s.type == 'VECTOR')
+    to_min_vector_input = next(s for s in map_range_node.inputs if s.name == 'To Min' and s.type == 'VECTOR')
+
+    # Link Value node and Multiply node to Map Range node using the correct vector inputs
+    links.new(value_node.outputs[0], to_max_vector_input)
     links.new(value_node.outputs[0], multiply_node.inputs[0])
-    links.new(multiply_node.outputs[0], map_range_node.inputs['To Min'])
-    links.new(map_range_node.outputs['Result'], add_vector_node.inputs[1])  # Changed 'Vector' to 'Result'
+    links.new(multiply_node.outputs[0], to_min_vector_input)
+
+    # Continue with the rest of the connections
+    links.new(map_range_node.outputs['Vector'], add_vector_node.inputs[1])  
     links.new(add_vector_node.outputs['Vector'], group_output.inputs['Vector'])
 
     print("Created Blur node group")
 
-def add_tiled_texture_nodes(material, texture_info, node_group_cache):
+def add_tiled_texture_nodes(material, texture_info, node_group_cache, base_path=None):
     """
     Adds tiled texture nodes to a material.
 
     :param material: The material to modify.
     :param texture_info: A dictionary containing texture information, including tiled frames.
     :param node_group_cache: A cache to store and retrieve existing node groups.
+    :param base_path: The base path where texture files are located.
     """
     nodes = material.node_tree.nodes
     links = material.node_tree.links
@@ -576,6 +602,10 @@ def add_tiled_texture_nodes(material, texture_info, node_group_cache):
     else:
         palette_mask_node_group = bpy.data.node_groups[palette_mask_node_group_name]
 
+    palette_mask_group_node = nodes.new(type='ShaderNodeGroup')
+    palette_mask_group_node.node_tree = palette_mask_node_group
+    palette_mask_group_node.location = (0, -200)
+
     # Iterate through tiled frames
     for frame_index, frame_data in enumerate(texture_info.get('frames', [])):
         if frame_data.get('type') == 'tiled':
@@ -586,28 +616,38 @@ def add_tiled_texture_nodes(material, texture_info, node_group_cache):
 
             tiled_texture_name = f"{color_index + 1}, {int(scale * 10)}, {blend}, {os.path.basename(frame_file)}"
 
-            # Create Image Texture node for the tiled texture
-            tiled_texture_node = nodes.new(type='ShaderNodeTexImage')
-            tiled_texture_node.image = bpy.data.images.load(frame_file)
-            tiled_texture_node.location = (-400, -200 - frame_index * 300)
-            tiled_texture_node.name = tiled_texture_name
-            tiled_texture_node.label = tiled_texture_name
+            # Construct full path to the file
+            full_path = os.path.join(base_path, frame_file) if base_path else frame_file
+            texture_path = bpy.path.abspath(full_path)
+
+            # Check if the file exists before loading
+            if not os.path.isfile(texture_path):
+                print(f"Warning: Tiled texture file not found: {texture_path}")
+                continue
+
+            try:
+                # Create Image Texture node for the tiled texture
+                tiled_texture_node = nodes.new(type='ShaderNodeTexImage')
+                tiled_texture_node.image = bpy.data.images.load(texture_path)
+                tiled_texture_node.location = (-400, -200 - frame_index * 300)
+                tiled_texture_node.name = tiled_texture_name
+                tiled_texture_node.label = tiled_texture_name
+            except RuntimeError as e:
+                print(f"Error loading tiled texture file: {texture_path}: {e}")
+                continue
 
             # Add the necessary nodes to manipulate the tiled texture
             index_color_node = nodes.new(type='ShaderNodeRGB')
             index_color_node.location = (-600, -200 - frame_index * 300)
             index_color_node.name = f"Index {color_index + 1} Color"
-            # Here you should define the RGB values from the palette; use (1.0, 0.0, 0.0, 1.0) as a placeholder
             index_color_node.outputs[0].default_value = (1.0, 0.0, 0.0, 1.0)
 
-            # Add a Texture Coordinate and Mapping nodes
-            add_texture_coordinate_and_mapping_nodes(nodes, links, tiled_texture_node, frame_file, scale)
+            # Add Texture Coordinate and Mapping nodes
+            tex_coord_node, mapping_node = add_texture_coordinate_and_mapping_nodes(nodes, links, tiled_texture_node, texture_path)
 
-            # Create a PaletteMask node group node
-            palette_mask_group_node = nodes.new(type='ShaderNodeGroup')
-            palette_mask_group_node.node_tree = palette_mask_node_group
-            palette_mask_group_node.location = (0, -200 - frame_index * 300)
-            
+            # Apply the scale to the Mapping node
+            apply_tiled_mapping(mapping_node, scale, has_dds_header(texture_path))
+
             # Connect nodes for palette masking
             if 'palette_mask_node' in texture_info:
                 palette_mask_node = texture_info['palette_mask_node']
@@ -646,6 +686,8 @@ def add_tiled_texture_nodes(material, texture_info, node_group_cache):
         if main_shader_node:
             links.new(main_shader_node.outputs['Shader'], mix_shader.inputs[0])
 
+    print(f"Added tiled texture nodes to material: {material.name}")
+
 def create_palette_mask_node_group(palette_mask_node_group):
     """
     Creates the PaletteMask node group used for tiled textures.
@@ -657,7 +699,7 @@ def create_palette_mask_node_group(palette_mask_node_group):
 
     # Create nodes inside the PaletteMask node group
     group_input = nodes.new('NodeGroupInput')
-    group_input.location = (-600, 0)
+    group_input.location = (-800, 0)
     palette_mask_node_group.inputs.new('NodeSocketColor', 'ClrPalette')
     palette_mask_node_group.inputs.new('NodeSocketColor', 'NdxClr')
     palette_mask_node_group.inputs.new('NodeSocketShader', 'Mix')
@@ -668,10 +710,10 @@ def create_palette_mask_node_group(palette_mask_node_group):
     palette_mask_node_group.outputs.new('NodeSocketShader', 'Shader')
 
     separate_clr_palette = nodes.new(type='ShaderNodeSeparateColor')
-    separate_clr_palette.location = (-400, 200)
+    separate_clr_palette.location = (-400, 300)
 
     separate_ndx_clr = nodes.new(type='ShaderNodeSeparateColor')
-    separate_ndx_clr.location = (-400, 0)
+    separate_ndx_clr.location = (-400, 100)
 
     less_than_red = nodes.new(type='ShaderNodeMath')
     less_than_red.operation = 'LESS_THAN'
@@ -697,29 +739,36 @@ def create_palette_mask_node_group(palette_mask_node_group):
     greater_than_blue.operation = 'GREATER_THAN'
     greater_than_blue.location = (-200, 50)
 
+    # Math nodes with updated default values for the second input
     add_red = nodes.new(type='ShaderNodeMath')
     add_red.operation = 'ADD'
     add_red.location = (-400, -100)
+    add_red.inputs[1].default_value = 0.001  # Updated default value
 
     sub_red = nodes.new(type='ShaderNodeMath')
     sub_red.operation = 'SUBTRACT'
     sub_red.location = (-400, -150)
+    sub_red.inputs[1].default_value = 0.001  # Updated default value
 
     add_green = nodes.new(type='ShaderNodeMath')
     add_green.operation = 'ADD'
     add_green.location = (-400, -200)
+    add_green.inputs[1].default_value = 0.001  # Updated default value
 
     sub_green = nodes.new(type='ShaderNodeMath')
     sub_green.operation = 'SUBTRACT'
     sub_green.location = (-400, -250)
+    sub_green.inputs[1].default_value = 0.001  # Updated default value
 
     add_blue = nodes.new(type='ShaderNodeMath')
     add_blue.operation = 'ADD'
     add_blue.location = (-400, -300)
+    add_blue.inputs[1].default_value = 0.001  # Updated default value
 
     sub_blue = nodes.new(type='ShaderNodeMath')
     sub_blue.operation = 'SUBTRACT'
     sub_blue.location = (-400, -350)
+    sub_blue.inputs[1].default_value = 0.001  # Updated default value
 
     multiply_red = nodes.new(type='ShaderNodeMath')
     multiply_red.operation = 'MULTIPLY'

@@ -76,3 +76,19 @@ def apply_detail_mapping(mapping_node, detail_value, has_dds_header):
     mapping_node.inputs['Scale'].default_value[1] = -detail_value if has_dds_header else detail_value
 
     print(f"Applied detail mapping: X scale = {detail_value}, Y scale = {'-' if has_dds_header else ''}{detail_value}")
+    
+def apply_tiled_mapping(mapping_node, scale_value, has_dds_header):
+    """
+    Applies tiled texture scaling to a mapping node.
+
+    :param mapping_node: The mapping node to adjust.
+    :param scale_value: The scale value to apply for tiled textures.
+    :param has_dds_header: Boolean indicating if the texture has a DDS header.
+    """
+    # Apply the scale_value to X scale
+    mapping_node.inputs['Scale'].default_value[0] = scale_value
+
+    # Apply the scale_value to Y scale, negate if texture has a DDS header
+    mapping_node.inputs['Scale'].default_value[1] = -scale_value if has_dds_header else scale_value
+
+    print(f"Applied tiled mapping: X scale = {scale_value}, Y scale = {'-' if has_dds_header else ''}{scale_value}")
