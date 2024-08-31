@@ -109,8 +109,8 @@ def create_materials(materials, textures, file_path, node_group_cache):
                 if frame_type == 'layer':
                     print(f"Adding layered texture nodes to material: {mat.name}")
                     add_layered_texture_nodes(mat, texture_info, node_group_cache, base_path=os.path.dirname(file_path))
-                elif frame.get('type') == 'detail':
-                    add_detail_texture_nodes(mat, frame, node_group_cache)
+                elif frame_type == 'detail':
+                    add_detail_texture_nodes(mat, texture_info, node_group_cache, base_path=os.path.dirname(file_path))
                 elif frame.get('type') == 'palette_mask':
                     add_palette_mask_texture_nodes(mat, frame, node_group_cache)
                 elif frame.get('type') == 'tiled':
@@ -284,6 +284,19 @@ def add_layered_texture_nodes(material, texture_info, node_group_cache, base_pat
         print(f"No main node group found in material: {material.name}")
         return
 
+    # Calculate positions relative to existing nodes
+    x_position = main_node_group.location.x
+    y_position = main_node_group.location.y
+
+    # Adjust positions for the Material Output node
+    material_output_node = material.node_tree.nodes.get('Material Output')
+    if material_output_node:
+        material_output_node.location.x += 300  # Move to the right
+        material_output_x = (main_node_group.location.x + material_output_node.location.x) / 2
+    else:
+        print(f"No material output node found for material: {material.name}")
+        return
+
     # Process layered frames
     for frame_data in texture_info.get('frames', []):
         if frame_data.get('type') == 'layer':
@@ -306,34 +319,33 @@ def add_layered_texture_nodes(material, texture_info, node_group_cache, base_pat
 
             # Add Image Texture node for the layer
             image_texture_node = nodes.new(type='ShaderNodeTexImage')
-            image_texture_node.location = (-600, 200)
+            image_texture_node.location = (x_position - 300, y_position - 400)
             image_texture_node.image = image
             image_texture_node.name = layer_name
             image_texture_node.label = layer_name
 
             # Add Texture Coordinate and Mapping nodes for the new image texture
-            result = add_texture_coordinate_and_mapping_nodes(nodes, links, image_texture_node, texture_path)
-            if result:
-                tex_coord_node, mapping_node = result
-                
-                # Ensure the Y axis is flipped for DDS textures
-                if has_dds_header(texture_path):
-                    mapping_node.inputs['Scale'].default_value[1] = -1
-            else:
-                print(f"Failed to add texture coordinate and mapping nodes for {frame_file}")
-                continue
+            tex_coord_node, mapping_node = add_texture_coordinate_and_mapping_nodes(nodes, links, image_texture_node, texture_path)
+
+            # Position the Texture Coordinate and Mapping nodes to align with the Image Texture node
+            tex_coord_node.location = (image_texture_node.location.x - 600, image_texture_node.location.y)
+            mapping_node.location = (image_texture_node.location.x - 300, image_texture_node.location.y)
+
+            # Ensure the Y axis is flipped for DDS textures
+            if has_dds_header(texture_path):
+                mapping_node.inputs['Scale'].default_value[1] = -1
 
             # Create another rendermethod node group for the layer
             layer_node_group = nodes.new(type='ShaderNodeGroup')
             layer_node_group.node_tree = main_node_group.node_tree
-            layer_node_group.location = (200, 200)
+            layer_node_group.location = (image_texture_node.location.x + 300, image_texture_node.location.y)
 
             # Connect the color output of the Image Texture node to the input of the layer's rendermethod node group
             links.new(image_texture_node.outputs['Color'], layer_node_group.inputs[0])
 
             # Add a Mix Shader node to blend the main texture and the layer
             mix_shader_node = nodes.new(type='ShaderNodeMixShader')
-            mix_shader_node.location = (400, 0)
+            mix_shader_node.location = (material_output_x, y_position - 150)
 
             # Connect main texture node group to the first shader input of Mix Shader
             links.new(main_node_group.outputs[0], mix_shader_node.inputs[1])
@@ -345,20 +357,19 @@ def add_layered_texture_nodes(material, texture_info, node_group_cache, base_pat
             links.new(image_texture_node.outputs['Alpha'], mix_shader_node.inputs['Fac'])
 
             # Update the output connection to go through the Mix Shader
-            material_output_node = material.node_tree.nodes.get('Material Output')
-            if material_output_node:
-                links.new(mix_shader_node.outputs[0], material_output_node.inputs['Surface'])
-                print(f"Connected mix shader output to material output for {material.name}")
+            links.new(mix_shader_node.outputs[0], material_output_node.inputs['Surface'])
+            print(f"Connected mix shader output to material output for {material.name}")
 
     print(f"Added layered texture nodes to material: {material.name}")
     
-def add_detail_texture_nodes(material, texture_info, node_group_cache):
+def add_detail_texture_nodes(material, texture_info, node_group_cache, base_path=None):
     """
     Adds detail texture nodes to a material.
 
     :param material: The material to modify.
     :param texture_info: A dictionary containing texture information, including detail frames.
     :param node_group_cache: A cache to store and retrieve existing node groups.
+    :param base_path: The base path where texture files are located.
     """
     nodes = material.node_tree.nodes
     links = material.node_tree.links
@@ -373,6 +384,16 @@ def add_detail_texture_nodes(material, texture_info, node_group_cache):
     if not main_node_group:
         print(f"No main node group found in material: {material.name}")
         return
+    
+    # Calculate positions relative to existing nodes
+    x_position = main_node_group.location.x
+    y_position = main_node_group.location.y
+    
+    # Adjust positions for the Material Output node
+    material_output_node = material.node_tree.nodes.get('Material Output')
+    if material_output_node:
+        material_output_node.location.x += 300  # Move to the right
+        material_output_x = (main_node_group.location.x + material_output_node.location.x) / 2
 
     # Process detail frames
     for frame_data in texture_info.get('frames', []):
@@ -382,33 +403,50 @@ def add_detail_texture_nodes(material, texture_info, node_group_cache):
             detail_file_name = os.path.basename(frame_file)
             detail_name = f"{detail_file_name}_DETAIL"
 
-            # Add Image Texture node for the detail
-            detail_texture_node = nodes.new(type='ShaderNodeTexImage')
-            detail_texture_node.location = (-600, -200)
-            detail_texture_node.image = bpy.data.images.load(frame_file)
-            detail_texture_node.name = detail_name
-            detail_texture_node.label = detail_name
+            # Construct full path to the file
+            full_path = os.path.join(base_path, frame_file) if base_path else frame_file
+            texture_path = bpy.path.abspath(full_path)
+
+            # Check if the file exists before loading
+            if not os.path.isfile(texture_path):
+                print(f"Warning: Detail texture file not found: {texture_path}")
+                continue
+
+            try:
+                # Add Image Texture node for the detail
+                detail_texture_node = nodes.new(type='ShaderNodeTexImage')
+                detail_texture_node.location = (x_position - 300, y_position - 400)
+                detail_texture_node.image = bpy.data.images.load(texture_path)
+                detail_texture_node.name = detail_name
+                detail_texture_node.label = detail_name
+            except RuntimeError as e:
+                print(f"Error loading detail texture file: {texture_path}: {e}")
+                continue
 
             # Add Texture Coordinate and Mapping nodes for the detail texture
             tex_coord_node, mapping_node = add_texture_coordinate_and_mapping_nodes(
-                nodes, links, detail_texture_node, frame_file
+                nodes, links, detail_texture_node, texture_path
             )
+            
+            # Position the Texture Coordinate and Mapping nodes to align with the Image Texture node
+            tex_coord_node.location = (detail_texture_node.location.x - 600, detail_texture_node.location.y)
+            mapping_node.location = (detail_texture_node.location.x - 300, detail_texture_node.location.y)
 
             # Apply detail_value to the Mapping node's scale inputs
             mapping_node.inputs['Scale'].default_value[0] = detail_value  # X scale
-            mapping_node.inputs['Scale'].default_value[1] = -detail_value if has_dds_header(frame_file) else detail_value  # Y scale
+            mapping_node.inputs['Scale'].default_value[1] = -detail_value if has_dds_header(texture_path) else detail_value  # Y scale
 
             # Create another rendermethod node group for the detail texture
             detail_node_group = nodes.new(type='ShaderNodeGroup')
             detail_node_group.node_tree = main_node_group.node_tree
-            detail_node_group.location = (200, -200)
+            detail_node_group.location = (detail_texture_node.location.x + 300, detail_texture_node.location.y)
 
             # Connect the color output of the detail Image Texture node to the input of the detail rendermethod node group
             links.new(detail_texture_node.outputs['Color'], detail_node_group.inputs[0])
 
             # Add a Mix Shader node to blend the main texture and the detail texture
             mix_shader_node = nodes.new(type='ShaderNodeMixShader')
-            mix_shader_node.location = (400, -200)
+            mix_shader_node.location = (material_output_x, y_position - 150)
             mix_shader_node.inputs['Fac'].default_value = 0.25  # Set the blending factor to 0.25
 
             # Connect main texture node group to the first shader input of Mix Shader
