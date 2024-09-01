@@ -488,7 +488,7 @@ def add_palette_mask_texture_nodes(material, texture_info, node_group_cache, bas
 
     blur_node = nodes.new(type='ShaderNodeGroup')
     blur_node.node_tree = blur_node_group
-    blur_node.location = (-600, -200)
+    blur_node.location = (-1600, -1200)
 
     # Process palette mask frames
     for frame_data in texture_info.get('frames', []):
@@ -507,7 +507,8 @@ def add_palette_mask_texture_nodes(material, texture_info, node_group_cache, bas
             try:
                 # Add Image Texture node for the palette mask
                 palette_mask_texture_node = nodes.new(type='ShaderNodeTexImage')
-                palette_mask_texture_node.location = (-400, -200)
+                palette_mask_texture_node.location = (-1400, -1200)
+                palette_mask_texture_node.interpolation = 'Closest'
                 palette_mask_texture_node.image = bpy.data.images.load(texture_path)
                 palette_mask_texture_node.image.colorspace_settings.name = 'Non-Color'
 
@@ -596,6 +597,27 @@ def add_tiled_texture_nodes(material, frame_data, texture_info, node_group_cache
 
     transparent_bsdf_node = None
     previous_palette_mask_group_output = None
+    palette_mask_texture_node = None
+
+    # Use the palette_mask_file to identify the palette_mask_texture_node
+    palette_mask_file = texture_info.get('palette_mask_file', '')
+
+    if palette_mask_file:
+        # Convert the palette mask file path to an absolute path
+        palette_mask_file_path = os.path.abspath(os.path.join(base_path, palette_mask_file)) if base_path else palette_mask_file
+
+        # Identify palette_mask_texture_node by matching the name with palette_mask_file
+        for node in nodes:
+            if node.type == 'TEX_IMAGE' and node.image and node.image.filepath == bpy.path.abspath(palette_mask_file_path):
+                palette_mask_texture_node = node
+                print(f"Identified palette_mask_texture_node: {palette_mask_texture_node.name}")
+                break
+
+    main_shader_node = None
+    for node in nodes:
+        if node.type == 'GROUP' and node.node_tree.name in node_group_cache:
+            main_shader_node = node
+            break
 
     # Create or get the PaletteMask node group definition
     palette_mask_node_group_name = "PaletteMask"
@@ -607,9 +629,8 @@ def add_tiled_texture_nodes(material, frame_data, texture_info, node_group_cache
 
     # Process the specific tiled frame
     if frame_data.get('type') == 'tiled':
-        frame_index = frame_data.get('frame_index', 0)  # Assuming frame_index is passed in frame_data
         frame_file = frame_data['file']
-        color_index = frame_data['color_index']
+        color_index = frame_data['color_index']  # Use color_index instead of frame_index
         scale = frame_data['scale']
         blend = frame_data['blend']
         num_tiled_frames = texture_info.get('num_tiled_frames', 0)  # Get num_tiled_frames from texture_info
@@ -639,7 +660,6 @@ def add_tiled_texture_nodes(material, frame_data, texture_info, node_group_cache
             return
 
         # Read the palette color for the current color index
-        palette_mask_file = texture_info.get('palette_mask_file')  # Changed to use 'palette_mask_file' from texture_info
         if palette_mask_file:
             palette_mask_path = os.path.join(base_path, palette_mask_file) if base_path else palette_mask_file
             if os.path.isfile(palette_mask_path):
@@ -655,7 +675,7 @@ def add_tiled_texture_nodes(material, frame_data, texture_info, node_group_cache
         # Add or create Index Color node with the proper name and color
         index_color_node_name = f"Index {color_index + 1} Color"
         index_color_node = nodes.new(type='ShaderNodeRGB')
-        index_color_node.location = (-600, -200 - (color_index + 1) * 300)
+        index_color_node.location = (-100, -150 - (color_index + 1) * 300)
         index_color_node.name = index_color_node_name
         index_color_node.outputs[0].default_value = (*palette_color, 1.0)  # Correctly set RGB + Alpha as 4 elements
 
@@ -666,17 +686,17 @@ def add_tiled_texture_nodes(material, frame_data, texture_info, node_group_cache
         apply_tiled_mapping(mapping_node, scale, has_dds_header(texture_path))
 
         # Create or reuse the PaletteMask node group
-        palette_mask_group_node_name = f"PaletteMask_{frame_index}"
+        palette_mask_group_node_name = f"PaletteMask"
         palette_mask_group_node = nodes.new(type='ShaderNodeGroup')
         palette_mask_group_node.node_tree = palette_mask_node_group
-        palette_mask_group_node.location = (0, -200 - (color_index + 1) * 300)
+        palette_mask_group_node.location = (100, -300 - (color_index + 1) * 300)
         palette_mask_group_node.name = palette_mask_group_node_name
 
         # Connect nodes for palette masking
         links.new(index_color_node.outputs['Color'], palette_mask_group_node.inputs['NdxClr'])
         links.new(tiled_texture_node.outputs['Color'], palette_mask_group_node.inputs['Texture'])
 
-        # If there's a previous palette mask node, connect its output
+        # If there's a previous palette mask node, connect its output to the Mix input of the current node
         if previous_palette_mask_group_output:
             links.new(previous_palette_mask_group_output, palette_mask_group_node.inputs['Mix'])
 
@@ -686,30 +706,68 @@ def add_tiled_texture_nodes(material, frame_data, texture_info, node_group_cache
         last_palette_mask_node = palette_mask_group_node
 
         # If this is the last tiled frame, prepare to connect the final output
-        if frame_index == num_tiled_frames - 1:
+        if color_index + 1 == num_tiled_frames:
             # Create the final mix shader to blend the last tiled texture with the base material
-            mix_shader = nodes.new(type='ShaderNodeMixShader')
-            mix_shader.location = (300, 0)
+            final_mix_shader = nodes.new(type='ShaderNodeMixShader')
+            final_mix_shader.location = (600, -1500)
 
             # Add a Transparent BSDF if not already created
             if not transparent_bsdf_node:
                 transparent_bsdf_node = nodes.new(type='ShaderNodeBsdfTransparent')
-                transparent_bsdf_node.location = (100, 0)
+                transparent_bsdf_node.location = (400, -1500)
 
-            links.new(transparent_bsdf_node.outputs['BSDF'], mix_shader.inputs[1])
-            links.new(last_palette_mask_node.outputs['Shader'], mix_shader.inputs[2])
+            # Connect the Transparent BSDF to the first input of the final mix shader
+            links.new(transparent_bsdf_node.outputs['BSDF'], final_mix_shader.inputs[1])
 
-            # Connect the mix shader to the material output
+            # Connect the last PaletteMask node group's Shader output to the second input of the final mix shader
+            links.new(last_palette_mask_node.outputs['Shader'], final_mix_shader.inputs[2])
+
+            # Create another mix shader for the base material blending
+            base_mix_shader = nodes.new(type='ShaderNodeMixShader')
+            base_mix_shader.location = (800, -1000)
+
+            # Connect the final mix shader output to the second input of the base mix shader
+            links.new(final_mix_shader.outputs['Shader'], base_mix_shader.inputs[2])
+
+            # Connect the main material shader output to the first input of the base mix shader
+            if main_shader_node:
+                links.new(main_shader_node.outputs[0], base_mix_shader.inputs[1])
+
+            # Connect the base mix shader to the material output
             material_output_node = nodes.get("Material Output")
             if material_output_node:
-                links.new(mix_shader.outputs['Shader'], material_output_node.inputs['Surface'])
+                links.new(base_mix_shader.outputs['Shader'], material_output_node.inputs['Surface'])
 
-            # Connect the main material shader output to the mix shader
-            main_shader_node = nodes.get('ShaderNodeGroup')
-            if main_shader_node:
-                links.new(main_shader_node.outputs['Shader'], mix_shader.inputs[0])
+                # Adjust the position of the material output node
+                material_output_node.location.x += 1000
+                material_output_node.location.y -= 1000
 
-    print(f"Added tiled texture nodes to material: {material.name} for frame index: {frame_index}")
+        else:
+            # Continue connecting the PaletteMask nodes if not the last tiled frame
+            if previous_palette_mask_group_output:
+                links.new(previous_palette_mask_group_output, palette_mask_group_node.inputs['Mix'])
+
+    print(f"Added tiled texture nodes to material: {material.name} for color index: {color_index}")
+
+    # Scan through material nodes to link PaletteMask node groups
+    palette_mask_nodes = [node for node in nodes if node.type == 'GROUP' and node.node_tree == palette_mask_node_group]
+
+    # Link the PaletteMask node groups and palette_mask_texture_node if found
+    for i in range(len(palette_mask_nodes)):
+        current_node = palette_mask_nodes[i]
+
+        # Connect the Color output of the palette_mask_texture_node to the ClrPalette input of each PaletteMask node group
+        if palette_mask_texture_node:
+            print(f"Connecting {palette_mask_texture_node.name} Color output to {current_node.name} ClrPalette input")
+            links.new(palette_mask_texture_node.outputs['Color'], current_node.inputs['ClrPalette'])
+
+        # Connect the Shader output of the current node to the Mix input of the next node, if not already connected
+        if i < len(palette_mask_nodes) - 1:
+            next_node = palette_mask_nodes[i + 1]
+            if not any(link.from_node == current_node and link.to_node == next_node for link in links):
+                links.new(current_node.outputs['Shader'], next_node.inputs['Mix'])
+
+    print(f"Linked PaletteMask node groups and palette_mask_texture_node for material: {material.name}")
 
 def read_bmp_palette_color(file_path, color_index):
     """
