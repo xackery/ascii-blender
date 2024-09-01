@@ -1,6 +1,7 @@
 import bpy
 import os
 import shutil
+import struct
 from material_utils import has_dds_header, add_texture_coordinate_and_mapping_nodes, apply_detail_mapping, apply_tiled_mapping
 from texture5ambientgouraud1 import create_node_group_t5ag1, create_material_with_node_group_t5ag1
 from transparent import create_node_group_transparent, create_material_with_node_group_transparent
@@ -103,8 +104,8 @@ def create_materials(materials, textures, file_path, node_group_cache):
                 add_animated_texture_nodes(mat, texture_info, base_path=os.path.dirname(file_path))
             
             # Check for layered textures
-            for frame in texture_info.get('frames', []):
-                frame_type = frame.get('type', '').lower()
+            for frame_data in texture_info.get('frames', []):
+                frame_type = frame_data.get('type', '').lower()
                 print(f"Processing frame type: {frame_type} for material: {mat.name}")
                 if frame_type == 'layer':
                     print(f"Adding layered texture nodes to material: {mat.name}")
@@ -114,7 +115,9 @@ def create_materials(materials, textures, file_path, node_group_cache):
                 elif frame_type == 'palette_mask':
                     add_palette_mask_texture_nodes(mat, texture_info, node_group_cache, base_path=os.path.dirname(file_path))
                 elif frame_type == 'tiled':
-                    add_tiled_texture_nodes(mat, texture_info, node_group_cache, base_path=os.path.dirname(file_path))
+                    # Pass the current frame_data to add_tiled_texture_nodes
+                    print(f"Adding tiled texture nodes for frame {frame_data} to material: {mat.name}")
+                    add_tiled_texture_nodes(mat, frame_data, texture_info, node_group_cache, base_path=os.path.dirname(file_path))
             
             created_materials[mat_name] = mat
 
@@ -578,23 +581,23 @@ def create_blur_node_group(blur_node_group):
 
     print("Created Blur node group")
 
-def add_tiled_texture_nodes(material, texture_info, node_group_cache, base_path=None):
+def add_tiled_texture_nodes(material, frame_data, texture_info, node_group_cache, base_path=None):
     """
-    Adds tiled texture nodes to a material.
+    Adds tiled texture nodes to a material for a specific frame.
 
     :param material: The material to modify.
-    :param texture_info: A dictionary containing texture information, including tiled frames.
+    :param frame_data: A dictionary containing information about the current tiled frame.
+    :param texture_info: A dictionary containing overall texture information, including the number of tiled frames.
     :param node_group_cache: A cache to store and retrieve existing node groups.
     :param base_path: The base path where texture files are located.
     """
     nodes = material.node_tree.nodes
     links = material.node_tree.links
 
-    last_palette_mask_node = None
-    previous_palette_mask_group_output = None
     transparent_bsdf_node = None
+    previous_palette_mask_group_output = None
 
-    # Create or get the PaletteMask node group
+    # Create or get the PaletteMask node group definition
     palette_mask_node_group_name = "PaletteMask"
     if palette_mask_node_group_name not in bpy.data.node_groups:
         palette_mask_node_group = bpy.data.node_groups.new(name=palette_mask_node_group_name, type='ShaderNodeTree')
@@ -602,91 +605,126 @@ def add_tiled_texture_nodes(material, texture_info, node_group_cache, base_path=
     else:
         palette_mask_node_group = bpy.data.node_groups[palette_mask_node_group_name]
 
-    palette_mask_group_node = nodes.new(type='ShaderNodeGroup')
-    palette_mask_group_node.node_tree = palette_mask_node_group
-    palette_mask_group_node.location = (0, -200)
+    # Process the specific tiled frame
+    if frame_data.get('type') == 'tiled':
+        frame_index = frame_data.get('frame_index', 0)  # Assuming frame_index is passed in frame_data
+        frame_file = frame_data['file']
+        color_index = frame_data['color_index']
+        scale = frame_data['scale']
+        blend = frame_data['blend']
+        num_tiled_frames = texture_info.get('num_tiled_frames', 0)  # Get num_tiled_frames from texture_info
 
-    # Iterate through tiled frames
-    for frame_index, frame_data in enumerate(texture_info.get('frames', [])):
-        if frame_data.get('type') == 'tiled':
-            frame_file = frame_data['file']
-            color_index = frame_data['color_index']
-            scale = frame_data['scale'] / 10.0
-            blend = frame_data['blend']
+        tiled_texture_name = f"{color_index + 1}, {int(scale / 10)}, {blend}, {os.path.basename(frame_file)}"
 
-            tiled_texture_name = f"{color_index + 1}, {int(scale * 10)}, {blend}, {os.path.basename(frame_file)}"
+        # Construct full path to the file
+        full_path = os.path.join(base_path, frame_file) if base_path else frame_file
+        texture_path = bpy.path.abspath(full_path)
 
-            # Construct full path to the file
-            full_path = os.path.join(base_path, frame_file) if base_path else frame_file
-            texture_path = bpy.path.abspath(full_path)
+        # Check if the file exists before loading
+        if not os.path.isfile(texture_path):
+            print(f"Warning: Tiled texture file not found: {texture_path}")
+            return
 
-            # Check if the file exists before loading
-            if not os.path.isfile(texture_path):
-                print(f"Warning: Tiled texture file not found: {texture_path}")
-                continue
-
-            try:
-                # Create Image Texture node for the tiled texture
+        try:
+            # Create or reuse Image Texture node for the tiled texture
+            tiled_texture_node = nodes.get(tiled_texture_name)
+            if not tiled_texture_node:
                 tiled_texture_node = nodes.new(type='ShaderNodeTexImage')
                 tiled_texture_node.image = bpy.data.images.load(texture_path)
-                tiled_texture_node.location = (-400, -200 - frame_index * 300)
+                tiled_texture_node.location = (-400, -200 - (color_index + 1) * 300)
                 tiled_texture_node.name = tiled_texture_name
                 tiled_texture_node.label = tiled_texture_name
-            except RuntimeError as e:
-                print(f"Error loading tiled texture file: {texture_path}: {e}")
-                continue
+        except RuntimeError as e:
+            print(f"Error loading tiled texture file: {texture_path}: {e}")
+            return
 
-            # Add the necessary nodes to manipulate the tiled texture
-            index_color_node = nodes.new(type='ShaderNodeRGB')
-            index_color_node.location = (-600, -200 - frame_index * 300)
-            index_color_node.name = f"Index {color_index + 1} Color"
-            index_color_node.outputs[0].default_value = (1.0, 0.0, 0.0, 1.0)
+        # Read the palette color for the current color index
+        palette_mask_file = texture_info.get('palette_mask_file')  # Changed to use 'palette_mask_file' from texture_info
+        if palette_mask_file:
+            palette_mask_path = os.path.join(base_path, palette_mask_file) if base_path else palette_mask_file
+            if os.path.isfile(palette_mask_path):
+                print(f"Palette mask texture file found: {palette_mask_path} for color index: {color_index}")
+                palette_color = read_bmp_palette_color(palette_mask_path, color_index)
+            else:
+                print(f"Warning: Palette mask texture file not found at path: {palette_mask_path} for color index: {color_index}")
+                palette_color = (1.0, 0.0, 0.0)  # Default to red if palette mask not found
+        else:
+            print(f"Warning: No palette mask texture file specified for color index: {color_index}")
+            palette_color = (1.0, 0.0, 0.0)  # Default to red if palette mask not found
 
-            # Add Texture Coordinate and Mapping nodes
-            tex_coord_node, mapping_node = add_texture_coordinate_and_mapping_nodes(nodes, links, tiled_texture_node, texture_path)
+        # Add or create Index Color node with the proper name and color
+        index_color_node_name = f"Index {color_index + 1} Color"
+        index_color_node = nodes.new(type='ShaderNodeRGB')
+        index_color_node.location = (-600, -200 - (color_index + 1) * 300)
+        index_color_node.name = index_color_node_name
+        index_color_node.outputs[0].default_value = (*palette_color, 1.0)  # Correctly set RGB + Alpha as 4 elements
 
-            # Apply the scale to the Mapping node
-            apply_tiled_mapping(mapping_node, scale, has_dds_header(texture_path))
+        # Add or reuse Texture Coordinate and Mapping nodes
+        tex_coord_node, mapping_node = add_texture_coordinate_and_mapping_nodes(nodes, links, tiled_texture_node, texture_path)
 
-            # Connect nodes for palette masking
-            if 'palette_mask_node' in texture_info:
-                palette_mask_node = texture_info['palette_mask_node']
-                links.new(palette_mask_node.outputs['Color'], palette_mask_group_node.inputs['ClrPalette'])
-            
-            links.new(index_color_node.outputs['Color'], palette_mask_group_node.inputs['NdxClr'])
-            links.new(tiled_texture_node.outputs['Color'], palette_mask_group_node.inputs['Texture'])
-            
-            if color_index > 0 and previous_palette_mask_group_output:
-                links.new(previous_palette_mask_group_output, palette_mask_group_node.inputs['Mix'])
+        # Apply the scale to the Mapping node
+        apply_tiled_mapping(mapping_node, scale, has_dds_header(texture_path))
 
-            previous_palette_mask_group_output = palette_mask_group_node.outputs['Shader']
+        # Create or reuse the PaletteMask node group
+        palette_mask_group_node_name = f"PaletteMask_{frame_index}"
+        palette_mask_group_node = nodes.new(type='ShaderNodeGroup')
+        palette_mask_group_node.node_tree = palette_mask_node_group
+        palette_mask_group_node.location = (0, -200 - (color_index + 1) * 300)
+        palette_mask_group_node.name = palette_mask_group_node_name
 
-            last_palette_mask_node = palette_mask_group_node
+        # Connect nodes for palette masking
+        links.new(index_color_node.outputs['Color'], palette_mask_group_node.inputs['NdxClr'])
+        links.new(tiled_texture_node.outputs['Color'], palette_mask_group_node.inputs['Texture'])
 
-    # Create the final mix shader to blend the last tiled texture with the base material
-    if last_palette_mask_node:
-        mix_shader = nodes.new(type='ShaderNodeMixShader')
-        mix_shader.location = (300, 0)
+        # If there's a previous palette mask node, connect its output
+        if previous_palette_mask_group_output:
+            links.new(previous_palette_mask_group_output, palette_mask_group_node.inputs['Mix'])
 
-        # Add a Transparent BSDF if not already created
-        if not transparent_bsdf_node:
-            transparent_bsdf_node = nodes.new(type='ShaderNodeBsdfTransparent')
-            transparent_bsdf_node.location = (100, 0)
-        
-        links.new(transparent_bsdf_node.outputs['BSDF'], mix_shader.inputs[1])
-        links.new(last_palette_mask_node.outputs['Shader'], mix_shader.inputs[2])
+        # Update previous output node
+        previous_palette_mask_group_output = palette_mask_group_node.outputs['Shader']
 
-        # Connect the mix shader to the material output
-        material_output_node = nodes.get("Material Output")
-        if material_output_node:
-            links.new(mix_shader.outputs['Shader'], material_output_node.inputs['Surface'])
+        last_palette_mask_node = palette_mask_group_node
 
-        # Connect the main material shader output to the mix shader
-        main_shader_node = nodes.get('ShaderNodeGroup')
-        if main_shader_node:
-            links.new(main_shader_node.outputs['Shader'], mix_shader.inputs[0])
+        # If this is the last tiled frame, prepare to connect the final output
+        if frame_index == num_tiled_frames - 1:
+            # Create the final mix shader to blend the last tiled texture with the base material
+            mix_shader = nodes.new(type='ShaderNodeMixShader')
+            mix_shader.location = (300, 0)
 
-    print(f"Added tiled texture nodes to material: {material.name}")
+            # Add a Transparent BSDF if not already created
+            if not transparent_bsdf_node:
+                transparent_bsdf_node = nodes.new(type='ShaderNodeBsdfTransparent')
+                transparent_bsdf_node.location = (100, 0)
+
+            links.new(transparent_bsdf_node.outputs['BSDF'], mix_shader.inputs[1])
+            links.new(last_palette_mask_node.outputs['Shader'], mix_shader.inputs[2])
+
+            # Connect the mix shader to the material output
+            material_output_node = nodes.get("Material Output")
+            if material_output_node:
+                links.new(mix_shader.outputs['Shader'], material_output_node.inputs['Surface'])
+
+            # Connect the main material shader output to the mix shader
+            main_shader_node = nodes.get('ShaderNodeGroup')
+            if main_shader_node:
+                links.new(main_shader_node.outputs['Shader'], mix_shader.inputs[0])
+
+    print(f"Added tiled texture nodes to material: {material.name} for frame index: {frame_index}")
+
+def read_bmp_palette_color(file_path, color_index):
+    """
+    Reads the color at the specified index from a BMP palette.
+
+    :param file_path: The path to the BMP file.
+    :param color_index: The index of the color in the BMP palette.
+    :return: The RGB color as a tuple (red, green, blue).
+    """
+    with open(file_path, 'rb') as f:
+        palette_offset = 54 + color_index * 4  # BMP header is 54 bytes + 4 bytes per color entry
+        f.seek(palette_offset)
+        palette_data = f.read(4)  # Read the color data (BGRX format)
+        blue, green, red, _ = struct.unpack('BBBB', palette_data)
+        return red / 255.0, green / 255.0, blue / 255.0
 
 def create_palette_mask_node_group(palette_mask_node_group):
     """

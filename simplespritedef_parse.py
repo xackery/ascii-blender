@@ -6,6 +6,7 @@ def simplespritedef_parse(lines):
     current_frames = []
     sleep_time = None
     animated_frame_count = 0
+    tiled_frame_count = 0  # Variable to keep track of the number of "tiled" frames
 
     # Regular expression to check for a number before the file extension
     animated_frame_regex = re.compile(r'.*\d(?=\.[a-zA-Z]+$)')
@@ -17,6 +18,7 @@ def simplespritedef_parse(lines):
         if line.startswith("SIMPLESPRITETAG"):
             # Store the previous texture data if any
             if current_texture:
+                current_texture['num_tiled_frames'] = tiled_frame_count  # Save the count of tiled frames
                 textures[current_texture['name']] = current_texture
                 print(f"Added texture to dictionary: {current_texture['name']}")
 
@@ -28,11 +30,14 @@ def simplespritedef_parse(lines):
                 'sleep': 'NULL',
                 'number_frames': 0,
                 'frame_files': [],
-                'properties': []
+                'properties': [],
+                'num_tiled_frames': 0,  # Initialize num_tiled_frames for the new texture
+                'palette_mask_file': None  # Initialize the palette_mask_file key
             }
             print(f"Started new SIMPLESPRITEDEF: {current_texture['name']}")
             current_frames = []
             animated_frame_count = 0
+            tiled_frame_count = 0  # Reset tiled frame count for new texture
             sleep_time = 'NULL'
 
         elif line.startswith("SLEEP?"):
@@ -69,6 +74,9 @@ def simplespritedef_parse(lines):
                     if previous_file.split('.')[0] == frame_file.replace("PAL.BMP", "").strip():
                         frame_data['type'] = 'palette_mask'
                         frame_data['file'] = frame_file
+
+                        # Save the palette mask file name separately in the current texture
+                        current_texture['palette_mask_file'] = frame_file
                 elif "," in frame_file:
                     num_values, file_name = frame_file.split(", ", 3)[-1], frame_file.split(", ", 3)[-1]
                     numbers = frame_file.split(", ")[:3]
@@ -77,6 +85,7 @@ def simplespritedef_parse(lines):
                     frame_data['scale'] = int(numbers[1]) * 10
                     frame_data['blend'] = int(numbers[2])
                     frame_data['file'] = file_name.strip()
+                    tiled_frame_count += 1  # Increment tiled frame count
                 else:
                     if sleep_time != "NULL" and sleep_time > 0 and animated_frame_regex.match(frame_file):
                         animated_frame_count += 1
@@ -90,6 +99,7 @@ def simplespritedef_parse(lines):
         elif line.startswith("ENDSIMPLESPRITEDEF"):
             if current_texture:
                 current_texture['number_frames'] = animated_frame_count
+                current_texture['num_tiled_frames'] = tiled_frame_count  # Save the count of tiled frames
                 textures[current_texture['name']] = current_texture
                 print(f"Added texture to dictionary: {current_texture['name']}")
                 current_texture = None
@@ -97,6 +107,7 @@ def simplespritedef_parse(lines):
     # After all lines are processed, add any remaining texture
     if current_texture:
         current_texture['number_frames'] = animated_frame_count
+        current_texture['num_tiled_frames'] = tiled_frame_count  # Save the count of tiled frames
         textures[current_texture['name']] = current_texture
         print(f"Added final texture to dictionary: {current_texture['name']}")
 

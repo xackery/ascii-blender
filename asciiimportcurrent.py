@@ -54,7 +54,7 @@ main_obj = bpy.data.objects.new(base_name, None)
 bpy.context.collection.objects.link(main_obj)
 
 def create_mesh(mesh_data, parent_obj, armature_obj=None, cumulative_matrices=None):
-    print(f"Creating mesh '{mesh_data['name']}'")
+    #print(f"Creating mesh '{mesh_data['name']}'")
 
     mesh = bpy.data.meshes.new(mesh_data['name'])
     obj = bpy.data.objects.new(mesh_data['name'], mesh)
@@ -171,7 +171,7 @@ def create_mesh(mesh_data, parent_obj, armature_obj=None, cumulative_matrices=No
                         obj.data.polygons[face_index].material_index = material_list_index
                         face_index += 1
 
-                print(f"Material index: {material_list_index}, Material name: {material_name}")
+                #print(f"Material index: {material_list_index}, Material name: {material_name}")
             else:
                 print(f"Material index: {material_index}, Material name: Unknown")
 
