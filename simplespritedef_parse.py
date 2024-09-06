@@ -13,14 +13,14 @@ def simplespritedef_parse(lines):
 
     for line in lines:
         line = line.strip()
-        print(f"Processing line: {line}")
+#        print(f"Processing line: {line}")
 
         if line.startswith("SIMPLESPRITETAG"):
             # Store the previous texture data if any
             if current_texture:
                 current_texture['num_tiled_frames'] = tiled_frame_count  # Save the count of tiled frames
                 textures[current_texture['name']] = current_texture
-                print(f"Added texture to dictionary: {current_texture['name']}")
+#                print(f"Added texture to dictionary: {current_texture['name']}")
 
             # Initialize new texture data
             current_texture = {
@@ -34,7 +34,7 @@ def simplespritedef_parse(lines):
                 'num_tiled_frames': 0,  # Initialize num_tiled_frames for the new texture
                 'palette_mask_file': None  # Initialize the palette_mask_file key
             }
-            print(f"Started new SIMPLESPRITEDEF: {current_texture['name']}")
+#            print(f"Started new SIMPLESPRITEDEF: {current_texture['name']}")
             current_frames = []
             animated_frame_count = 0
             tiled_frame_count = 0  # Reset tiled frame count for new texture
@@ -53,7 +53,7 @@ def simplespritedef_parse(lines):
             else:
                 sleep_time = "NULL"
                 current_texture['animated'] = False
-            print(f"Set sleep time for {current_texture['name']}: {sleep_time}")
+#            print(f"Set sleep time for {current_texture['name']}: {sleep_time}")
 
         elif line.startswith("FRAME"):
             parts = line.split('"')
@@ -94,14 +94,14 @@ def simplespritedef_parse(lines):
                 current_frames.append(frame_data)
                 current_texture['frame_files'].append(frame_data['file'])
                 current_texture['frames'].append(frame_data)
-                print(f"Added frame for {current_texture['name']}: {frame_data}")
+#                print(f"Added frame for {current_texture['name']}: {frame_data}")
 
         elif line.startswith("ENDSIMPLESPRITEDEF"):
             if current_texture:
                 current_texture['number_frames'] = animated_frame_count
                 current_texture['num_tiled_frames'] = tiled_frame_count  # Save the count of tiled frames
                 textures[current_texture['name']] = current_texture
-                print(f"Added texture to dictionary: {current_texture['name']}")
+#                print(f"Added texture to dictionary: {current_texture['name']}")
                 current_texture = None
 
     # After all lines are processed, add any remaining texture
@@ -109,12 +109,12 @@ def simplespritedef_parse(lines):
         current_texture['number_frames'] = animated_frame_count
         current_texture['num_tiled_frames'] = tiled_frame_count  # Save the count of tiled frames
         textures[current_texture['name']] = current_texture
-        print(f"Added final texture to dictionary: {current_texture['name']}")
+#        print(f"Added final texture to dictionary: {current_texture['name']}")
 
-    print("Textures inside simplespritedef_parse function:")
-    for key, value in textures.items():
-        print(f"Texture Name: {key}")
-        for k, v in value.items():
-            print(f"  {k}: {v}")
+#    print("Textures inside simplespritedef_parse function:")
+#    for key, value in textures.items():
+#        print(f"Texture Name: {key}")
+#        for k, v in value.items():
+#            print(f"  {k}: {v}")
     
     return textures

@@ -28,7 +28,7 @@ def check_and_fix_dds(texture_path):
             
             if mip_map_count == 0 and (flags & DDSD_MIPMAPCOUNT) and (compression == DXT1_COMPRESSION or compression == DXT5_COMPRESSION):
                 # If mip map count is 0, the mip map flag is set, and the compression is DXT1 or DXT5, turn off the mip map flag
-                print(f"Modifying {texture_path}: Turning off mip map flag for {compression.decode('ascii')}.")
+#                print(f"Modifying {texture_path}: Turning off mip map flag for {compression.decode('ascii')}.")
                 flags &= ~DDSD_MIPMAPCOUNT
                 
                 # Write the modified flags back to the file

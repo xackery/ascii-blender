@@ -78,7 +78,7 @@ def eq_ascii_parse(filepath):
     # Parse SIMPLESPRITEDEF sections
     textures = {}
     for instance in parsed_sections.get('SIMPLESPRITEDEF', []):
-        print(f"SIMPLESPRITEDEF Instance: {instance}")  # Debug print to check instance content
+#        print(f"SIMPLESPRITEDEF Instance: {instance}")  # Debug print to check instance content
         sprite_textures = simplespritedef_parse(instance)
         if sprite_textures:
             textures.update(sprite_textures)  # Correctly update the textures dictionary
@@ -105,11 +105,11 @@ if __name__ == '__main__':
     filepath = r"C:\Users\dariu\Documents\Quail\crushbone.quail\r.mod"
     meshes, armature_data, track_definitions, material_palettes, include_files, polyhedrons, textures, materials = eq_ascii_parse(filepath)
 
-    print("\nParsed Textures:")
-    if textures:
-        for name, data in textures.items():
-            print(f"Texture Name: {name}")
-            for key, value in data.items():
-                print(f"  {key}: {value}")
-    else:
-        print("No textures parsed.")
+#    print("\nParsed Textures:")
+#    if textures:
+#        for name, data in textures.items():
+#            print(f"Texture Name: {name}")
+#            for key, value in data.items():
+#                print(f"  {key}: {value}")
+#    else:
+#        print("No textures parsed.")

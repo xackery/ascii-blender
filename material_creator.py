@@ -29,7 +29,7 @@ def get_or_create_node_group(group_name, create_function, node_group_cache, text
     if group_name in bpy.data.node_groups:
         node_group = bpy.data.node_groups[group_name]
         node_group_cache[group_name] = node_group
-        print(f"Using existing node group: {group_name}")
+#        print(f"Using existing node group: {group_name}")
     else:
         # If not, create a new node group using the provided function
         if texture_path:
@@ -37,7 +37,7 @@ def get_or_create_node_group(group_name, create_function, node_group_cache, text
         else:
             node_group = create_function()
         node_group_cache[group_name] = node_group
-        print(f"Created new node group: {group_name}")
+#        print(f"Created new node group: {group_name}")
     
     return node_group
 
@@ -106,7 +106,7 @@ def create_materials(materials, textures, file_path, node_group_cache):
             # Check for layered textures
             for frame_data in texture_info.get('frames', []):
                 frame_type = frame_data.get('type', '').lower()
-                print(f"Processing frame type: {frame_type} for material: {mat.name}")
+#                print(f"Processing frame type: {frame_type} for material: {mat.name}")
                 if frame_type == 'layer':
                     print(f"Adding layered texture nodes to material: {mat.name}")
                     add_layered_texture_nodes(mat, texture_info, node_group_cache, base_path=os.path.dirname(file_path))
@@ -116,7 +116,7 @@ def create_materials(materials, textures, file_path, node_group_cache):
                     add_palette_mask_texture_nodes(mat, texture_info, node_group_cache, base_path=os.path.dirname(file_path))
                 elif frame_type == 'tiled':
                     # Pass the current frame_data to add_tiled_texture_nodes
-                    print(f"Adding tiled texture nodes for frame {frame_data} to material: {mat.name}")
+#                    print(f"Adding tiled texture nodes for frame {frame_data} to material: {mat.name}")
                     add_tiled_texture_nodes(mat, frame_data, texture_info, node_group_cache, base_path=os.path.dirname(file_path))
             
             created_materials[mat_name] = mat
@@ -172,7 +172,7 @@ def add_animated_texture_nodes(material, texture_info, base_path=None):
         if base_path:
             full_path = os.path.join(base_path, frame_file)
         else:
-            print(f"Warning: base_path is not provided. Using frame file as is: {frame_file}")
+#            print(f"Warning: base_path is not provided. Using frame file as is: {frame_file}")
             full_path = frame_file
 
         texture_path = bpy.path.abspath(full_path)  # Convert to absolute path
@@ -200,7 +200,7 @@ def add_animated_texture_nodes(material, texture_info, base_path=None):
 
             try:
                 shutil.copy(texture_path, new_full_path)
-                print(f"Copied and renamed {texture_path} to {new_full_path}")
+#                print(f"Copied and renamed {texture_path} to {new_full_path}")
                 frame_file = new_file_name  # Update frame file to the newly created file
             except Exception as e:
                 print(f"Error copying and renaming file {texture_path} to {new_full_path}: {e}")
@@ -259,7 +259,7 @@ def add_animated_texture_nodes(material, texture_info, base_path=None):
         frame_name = f"Frame name {idx + 1:03}"  # Zero-padded frame number
         material[frame_name] = frame_file
 
-    print(f"Added animated texture nodes to material: {material.name}")
+#    print(f"Added animated texture nodes to material: {material.name}")
 
 def add_layered_texture_nodes(material, texture_info, node_group_cache, base_path=None):
     """
@@ -270,8 +270,8 @@ def add_layered_texture_nodes(material, texture_info, node_group_cache, base_pat
     :param node_group_cache: A cache to store and retrieve existing node groups.
     :param base_path: The base path where texture files are located.
     """
-    print(f"add_layered_texture_nodes called for material: {material.name}")
-    print(f"Texture info: {texture_info}")
+#    print(f"add_layered_texture_nodes called for material: {material.name}")
+#    print(f"Texture info: {texture_info}")
 
     nodes = material.node_tree.nodes
     links = material.node_tree.links
@@ -311,7 +311,7 @@ def add_layered_texture_nodes(material, texture_info, node_group_cache, base_pat
             full_path = os.path.join(base_path, frame_file) if base_path else frame_file
             texture_path = bpy.path.abspath(full_path)
 
-            print(f"Loading image file: {texture_path}")
+#            print(f"Loading image file: {texture_path}")
 
             try:
                 # Attempt to load the image
@@ -361,9 +361,9 @@ def add_layered_texture_nodes(material, texture_info, node_group_cache, base_pat
 
             # Update the output connection to go through the Mix Shader
             links.new(mix_shader_node.outputs[0], material_output_node.inputs['Surface'])
-            print(f"Connected mix shader output to material output for {material.name}")
+#            print(f"Connected mix shader output to material output for {material.name}")
 
-    print(f"Added layered texture nodes to material: {material.name}")
+#    print(f"Added layered texture nodes to material: {material.name}")
     
 def add_detail_texture_nodes(material, texture_info, node_group_cache, base_path=None):
     """
@@ -464,7 +464,7 @@ def add_detail_texture_nodes(material, texture_info, node_group_cache, base_path
                     links.new(mix_shader_node.outputs[0], link.to_socket)
                     break
 
-    print(f"Added detail texture nodes to material: {material.name}")
+#    print(f"Added detail texture nodes to material: {material.name}")
 
 def add_palette_mask_texture_nodes(material, texture_info, node_group_cache, base_path=None):
     """
@@ -521,7 +521,7 @@ def add_palette_mask_texture_nodes(material, texture_info, node_group_cache, bas
 
             # Store the palette mask node for future use in tiled textures
             texture_info['palette_mask_node'] = palette_mask_texture_node
-            print(f"Added palette mask texture node to material: {material.name}")
+#            print(f"Added palette mask texture node to material: {material.name}")
 
 def create_blur_node_group(blur_node_group):
     """
@@ -580,7 +580,7 @@ def create_blur_node_group(blur_node_group):
     links.new(map_range_node.outputs['Vector'], add_vector_node.inputs[1])  
     links.new(add_vector_node.outputs['Vector'], group_output.inputs['Vector'])
 
-    print("Created Blur node group")
+#    print("Created Blur node group")
 
 def add_tiled_texture_nodes(material, frame_data, texture_info, node_group_cache, base_path=None):
     """
@@ -610,7 +610,7 @@ def add_tiled_texture_nodes(material, frame_data, texture_info, node_group_cache
         for node in nodes:
             if node.type == 'TEX_IMAGE' and node.image and node.image.filepath == bpy.path.abspath(palette_mask_file_path):
                 palette_mask_texture_node = node
-                print(f"Identified palette_mask_texture_node: {palette_mask_texture_node.name}")
+#                print(f"Identified palette_mask_texture_node: {palette_mask_texture_node.name}")
                 break
 
     main_shader_node = None
@@ -663,13 +663,13 @@ def add_tiled_texture_nodes(material, frame_data, texture_info, node_group_cache
         if palette_mask_file:
             palette_mask_path = os.path.join(base_path, palette_mask_file) if base_path else palette_mask_file
             if os.path.isfile(palette_mask_path):
-                print(f"Palette mask texture file found: {palette_mask_path} for color index: {color_index}")
+#                print(f"Palette mask texture file found: {palette_mask_path} for color index: {color_index}")
                 palette_color = read_bmp_palette_color(palette_mask_path, color_index)
             else:
-                print(f"Warning: Palette mask texture file not found at path: {palette_mask_path} for color index: {color_index}")
+#                print(f"Warning: Palette mask texture file not found at path: {palette_mask_path} for color index: {color_index}")
                 palette_color = (1.0, 0.0, 0.0)  # Default to red if palette mask not found
         else:
-            print(f"Warning: No palette mask texture file specified for color index: {color_index}")
+#            print(f"Warning: No palette mask texture file specified for color index: {color_index}")
             palette_color = (1.0, 0.0, 0.0)  # Default to red if palette mask not found
 
         # Add or create Index Color node with the proper name and color
@@ -747,7 +747,7 @@ def add_tiled_texture_nodes(material, frame_data, texture_info, node_group_cache
             if previous_palette_mask_group_output:
                 links.new(previous_palette_mask_group_output, palette_mask_group_node.inputs['Mix'])
 
-    print(f"Added tiled texture nodes to material: {material.name} for color index: {color_index}")
+#    print(f"Added tiled texture nodes to material: {material.name} for color index: {color_index}")
 
     # Scan through material nodes to link PaletteMask node groups
     palette_mask_nodes = [node for node in nodes if node.type == 'GROUP' and node.node_tree == palette_mask_node_group]
@@ -758,7 +758,7 @@ def add_tiled_texture_nodes(material, frame_data, texture_info, node_group_cache
 
         # Connect the Color output of the palette_mask_texture_node to the ClrPalette input of each PaletteMask node group
         if palette_mask_texture_node:
-            print(f"Connecting {palette_mask_texture_node.name} Color output to {current_node.name} ClrPalette input")
+#            print(f"Connecting {palette_mask_texture_node.name} Color output to {current_node.name} ClrPalette input")
             links.new(palette_mask_texture_node.outputs['Color'], current_node.inputs['ClrPalette'])
 
         # Connect the Shader output of the current node to the Mix input of the next node, if not already connected
@@ -767,7 +767,7 @@ def add_tiled_texture_nodes(material, frame_data, texture_info, node_group_cache
             if not any(link.from_node == current_node and link.to_node == next_node for link in links):
                 links.new(current_node.outputs['Shader'], next_node.inputs['Mix'])
 
-    print(f"Linked PaletteMask node groups and palette_mask_texture_node for material: {material.name}")
+#    print(f"Linked PaletteMask node groups and palette_mask_texture_node for material: {material.name}")
 
 def read_bmp_palette_color(file_path, color_index):
     """
@@ -936,4 +936,4 @@ def create_palette_mask_node_group(palette_mask_node_group):
     links.new(emission_shader.outputs['Emission'], mix_shader.inputs[2])
     links.new(mix_shader.outputs['Shader'], group_output.inputs['Shader'])
 
-    print("Created PaletteMask node group")
+#    print("Created PaletteMask node group")

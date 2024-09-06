@@ -30,7 +30,8 @@ def process_track_definition(lines, existing_track_definitions):
     track_def = {
         'name': '',
         'num_frames': 0,
-        'frame_transforms': []
+        'frame_transforms': [],
+        'xyz_scale': 256
     }
     
     frame_transform = None
@@ -49,11 +50,12 @@ def process_track_definition(lines, existing_track_definitions):
             }
         elif line.startswith("XYZSCALE"):
             xyz_scale = float(line.split()[1])
+            track_def['xyz_scale'] = xyz_scale
         elif line.startswith("XYZ"):
             parts = line.split()
-            tx = float(parts[1]) / xyz_scale
-            ty = float(parts[2]) / xyz_scale
-            tz = float(parts[3]) / xyz_scale
+            tx = float(parts[1]) / 256
+            ty = float(parts[2]) / 256
+            tz = float(parts[3]) / 256
             frame_transform['translation'] = (tx, ty, tz)
         elif line.startswith("ROTSCALE?"):
             rot_scale = float(line.split()[1])

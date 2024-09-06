@@ -7,10 +7,6 @@ def polyhedrondefinition_parse(lines):
         'faces': []
     }
 
-    current_face = None
-    num_vertices = 0
-    num_faces = 0
-
     line_index = 0
     while line_index < len(lines):
         line = lines[line_index].strip()
@@ -33,20 +29,19 @@ def polyhedrondefinition_parse(lines):
         elif line.startswith("NUMFACES"):
             num_faces = int(line.split()[1])
             print(f"Parsing {num_faces} faces")
-        elif line.startswith("FACE"):
-            current_face = {
-                'num_vertices': 0,
-                'vertex_list': []
+        elif line.startswith("VERTEXLIST"):
+            # Parse the vertex list directly from the line
+            data = list(map(int, line.split()[1:]))
+            num_vertices_in_face = data[0]
+            vertex_list = data[1:num_vertices_in_face + 1]  # Extract the vertex indices for the face
+
+            # Add the face to the polyhedron's face list
+            face = {
+                'num_vertices': num_vertices_in_face,
+                'vertex_list': vertex_list
             }
-        elif line.startswith("NUMVERTICES") and current_face is not None:
-            current_face['num_vertices'] = int(line.split()[1])
-        elif line.startswith("VERTEXLIST") and current_face is not None:
-            vertex_list = [int(v.strip(',')) - 1 for v in line.split()[1:]]
-            current_face['vertex_list'] = vertex_list
-            print(f"Added face: {vertex_list}")
-        elif line.startswith("ENDFACE") and current_face is not None:
-            polyhedron['faces'].append(current_face)
-            current_face = None
+            polyhedron['faces'].append(face)
+            print(f"Added face: {face}")
 
         line_index += 1
 
@@ -55,7 +50,19 @@ def polyhedrondefinition_parse(lines):
 # Example usage
 if __name__ == '__main__':
     lines = [
-        # Add your test lines here for example usage
+        'TAG "example_polyhedron"',
+        'BOUNDINGRADIUS 5.0',
+        'SCALEFACTOR 1.0',
+        'NUMVERTICES 5',
+        'XYZ 0.0 0.0 0.0',
+        'XYZ 1.0 0.0 0.0',
+        'XYZ 1.0 1.0 0.0',
+        'XYZ 0.0 1.0 0.0',
+        'XYZ 0.5 0.5 1.0',
+        'NUMFACES 3',
+        'VERTEXLIST 3 0 1 2',
+        'VERTEXLIST 3 2 3 4',
+        'VERTEXLIST 3 0 4 1'
     ]
 
     polyhedron = polyhedrondefinition_parse(lines)
