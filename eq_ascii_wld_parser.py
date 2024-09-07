@@ -43,13 +43,6 @@ def eq_ascii_parse(filepath):
     # Start the recursive parsing from the main file
     parsed_sections, include_paths = recursive_parse(filepath)
 
-    # Print out the sections for debugging
-    # print("\nParsed Sections:")
-    # for section, instances in parsed_sections.items():
-    #     print(f"Section: {section}")
-    #     for instance in instances:
-    #         print(f"Instance: {instance}")  # Print the full content of each instance
-
     # Parse material palettes
     material_palettes = {}
     for instance in parsed_sections.get('MATERIALPALETTE', []):
@@ -68,26 +61,28 @@ def eq_ascii_parse(filepath):
     for instance in parsed_sections.get('HIERARCHICALSPRITEDEF', []):
         armature_data = hierarchicalspritedef_parse(instance)
 
+    # Debug print to display the collected armature data
+    if armature_data:
+        print("\nCollected Armature Data:")
+        for key, value in armature_data.items():
+            print(f"{key}: {value}")
+
     # Parse POLYHEDRONDEFINITION sections
     polyhedrons = []
     for instance in parsed_sections.get('POLYHEDRONDEFINITION', []):
-        # print(f"Polyhedron Instance: {instance}")  # Debug print to check instance content
         polyhedron = polyhedrondefinition_parse(instance)
         polyhedrons.append(polyhedron)
 
     # Parse SIMPLESPRITEDEF sections
     textures = {}
     for instance in parsed_sections.get('SIMPLESPRITEDEF', []):
-#        print(f"SIMPLESPRITEDEF Instance: {instance}")  # Debug print to check instance content
         sprite_textures = simplespritedef_parse(instance)
         if sprite_textures:
-            textures.update(sprite_textures)  # Correctly update the textures dictionary
             textures.update(sprite_textures)
 
     # Parse MATERIALDEFINITION sections
     materials = []
     for instance in parsed_sections.get('MATERIALDEFINITION', []):
-        # print(f"MATERIALDEFINITION Instance: {instance}")  # Debug print to check instance content
         material_defs = materialdefinition_parse(instance)
         materials.extend(material_defs)
 
@@ -105,11 +100,8 @@ if __name__ == '__main__':
     filepath = r"C:\Users\dariu\Documents\Quail\crushbone.quail\r.mod"
     meshes, armature_data, track_definitions, material_palettes, include_files, polyhedrons, textures, materials = eq_ascii_parse(filepath)
 
-#    print("\nParsed Textures:")
-#    if textures:
-#        for name, data in textures.items():
-#            print(f"Texture Name: {name}")
-#            for key, value in data.items():
-#                print(f"  {key}: {value}")
-#    else:
-#        print("No textures parsed.")
+    # If armature data exists, print it out (for extra clarity outside of the function)
+    if armature_data:
+        print("\nFinal Collected Armature Data:")
+        for key, value in armature_data.items():
+            print(f"{key}: {value}")

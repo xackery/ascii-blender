@@ -18,7 +18,7 @@ from create_polyhedron import create_polyhedron
 from material_creator import create_materials  # Import the material creation function
 
 # Path to the text file
-file_path = r"C:\Users\dariu\Documents\Quail\firiona_chr.quail\drm.mod"
+file_path = r"C:\Users\dariu\Documents\Quail\chequip.quail\fro.mod"
 
 # Get the base name for the main object
 base_name = os.path.splitext(os.path.basename(file_path))[0]
@@ -53,7 +53,7 @@ for polyhedron_data in polyhedrons:
 main_obj = bpy.data.objects.new(base_name, None)
 bpy.context.collection.objects.link(main_obj)
 
-def create_mesh(mesh_data, parent_obj, armature_obj=None, cumulative_matrices=None):
+def create_mesh(mesh_data, parent_obj, armature_obj=None):
     #print(f"Creating mesh '{mesh_data['name']}'")
 
     mesh = bpy.data.meshes.new(mesh_data['name'])
@@ -85,31 +85,12 @@ def create_mesh(mesh_data, parent_obj, armature_obj=None, cumulative_matrices=No
         mesh.normals_split_custom_set_from_vertices(mesh_data['normals'])
 
     # Create vertex groups if armature data is available
-    if armature_obj and cumulative_matrices:
-        if 'vertex_groups' in mesh_data and mesh_data['vertex_groups']:
-            for vg_start, vg_end, bone_index in mesh_data['vertex_groups']:
-                bone_name = armature_data['bones'][bone_index]['name']
-                group = obj.vertex_groups.new(name=bone_name)
-                group.add(range(vg_start, vg_end), 1.0, 'ADD')
-        else:
-            # No vertex groups, find bone with matching sprite
-            for bone in armature_data['bones']:
-                if bone.get('sprite') == mesh_data['name']:
-                    bone_obj = armature_obj.pose.bones.get(bone['name'])
-                    if bone_obj:
-                        # Just parent the mesh to the bone, without applying transformations
-                        obj.parent = armature_obj
-                        obj.parent_bone = bone_obj.name
-                        obj.parent_type = 'BONE'
-                    
-                        # Optionally, update the scene graph to reflect the new parenting
-                        bpy.context.view_layer.update()
-                        break  # Exit loop once the correct bone is found
-
-        # Add an armature modifier
-        modifier = obj.modifiers.new(name="Armature", type='ARMATURE')
-        modifier.object = armature_obj
-
+    if armature_obj and 'vertex_groups' in mesh_data and mesh_data['vertex_groups']:
+        for vg_start, vg_end, bone_index in mesh_data['vertex_groups']:
+            bone_name = armature_data['bones'][bone_index]['name']
+            group = obj.vertex_groups.new(name=bone_name)
+            group.add(range(vg_start, vg_end), 1.0, 'ADD')
+        
     # Create materials only if face materials exist
     if 'face_materials' in mesh_data and mesh_data['face_materials']:
         palette_name = mesh_data.get('material_palette', None)
@@ -168,64 +149,39 @@ def create_armature(armature_data, armature_tracks, parent_obj):
 
     armature.edit_bones.remove(armature.edit_bones[0])
 
+    # Extract the bounding_radius and calculate the tail length
+    bounding_radius = armature_data.get('bounding_radius', 1.0)  # Default to 1.0 if bounding_radius is not provided
+    tail_length = round(bounding_radius / 10, 2)  # Calculate tail length based on bounding_radius
+
     bone_map = {}
     cumulative_matrices = {}
     for index, bone in enumerate(armature_data['bones']):
         bone_name = bone['name']
         bone_bpy = armature.edit_bones.new(bone_name)
-#        print(f"Created bone: {bone_name} at index {index}")
+        # Set the head of the bone at (0, 0, 0)
         bone_bpy.head = (0, 0, 0)
-        bone_bpy.tail = (0, 1, 0)
+        # Set the tail Y position relative to the bounding_radius
+        bone_bpy.tail = (0, tail_length, 0)
 
         bone_map[index] = bone_bpy
 
     bpy.ops.object.mode_set(mode='EDIT')
 
     for parent_index, child_indices in armature_data['relationships']:
-#        print(f"Parent: {parent_index}, Children: {child_indices}")
         parent_bone = bone_map.get(parent_index)
         if not parent_bone:
             continue
-#        parent_matrix = parent_bone.matrix.copy()
         for child_index in child_indices:
             child_bone = bone_map.get(child_index)
             if child_bone:
-#                print(f"Setting parent of {child_bone.name} to {parent_bone.name}")
-#                child_bone.matrix = parent_matrix @ child_bone.matrix
                 child_bone.parent = parent_bone
 
                 cumulative_matrices[child_bone.name] = child_bone.matrix
 
         if not parent_bone.children:
-            parent_bone.tail = parent_bone.head + mathutils.Vector((0, .5, 0))
+            parent_bone.tail = parent_bone.head + mathutils.Vector((0, tail_length, 0))
 
     bpy.ops.object.mode_set(mode='OBJECT')
-
-    preferred_children = ["AB_DAG", "CH_DAG", "NE_DAG", "HEAD_DAG", "HE_DAG", "CHEST01_DAG", "NECK01_DAG", "NECK02_DAG", "HEAD01_DAG", "HEAD_POINT_DAG", "HORSECHEST01_DAG", "MID11_DAG"]
-
-    # Set the tail of each bone to the head of its child bone
-#    bpy.ops.object.mode_set(mode='EDIT')
-#    for bone in armature.edit_bones:
-#        if bone.children:
-#            preferred_child = None
-#            for child in bone.children:
-#                child_name_no_prefix = child.name.replace(prefix, "")
-#                if child_name_no_prefix in preferred_children:
-#                    preferred_child = child
-#                    break
-#            if preferred_child:
-#                if (bone.head - preferred_child.head).length < 0.001:
-#                    bone.tail = bone.head + mathutils.Vector((0, 0.001, 0))
-#                else:
-#                    bone.tail = preferred_child.head
-#            else:
-#                if (bone.head - bone.children[0].head).length < 0.001:
-#                    bone.tail = bone.head + mathutils.Vector((0, 0.001, 0))
-#                else:
-#                    bone.tail = bone.children[0].head
-#        else:
-#            bone.tail = bone.head + mathutils.Vector((1, 0, 0))
-#    bpy.ops.object.mode_set(mode='OBJECT')
 
     # Adjust origin by the center_offset value only if it exists and is not NULL
     center_offset_data = armature_data.get('center_offset')
@@ -238,14 +194,49 @@ def create_armature(armature_data, armature_tracks, parent_obj):
 
     return armature_obj, bone_map, cumulative_matrices
 
+# Function to handle parenting and modifiers for meshes
+def assign_mesh_to_armature(mesh_obj, armature_obj, armature_data, cumulative_matrices):
+    mesh_name = mesh_obj.name
+
+    # Check if mesh belongs to attached skins
+    for skin_data in armature_data.get('attached_skins', []):
+        if skin_data['sprite'] == mesh_name:
+            mesh_obj.parent = armature_obj
+            mesh_obj.modifiers.new(name="Armature", type='ARMATURE').object = armature_obj
+            mesh_obj["LINKSKINUPDATESTODAGINDEX"] = skin_data['link_skin_updates_to_dag_index']
+            print(f"Mesh '{mesh_name}' parented to armature and assigned LINKSKINUPDATESTODAGINDEX: {skin_data['link_skin_updates_to_dag_index']}")
+            return  # Mesh is assigned, no need to check further
+
+    # Check if mesh belongs to a bone's sprite
+    for bone in armature_data['bones']:
+        if bone.get('sprite') == mesh_name:
+            bone_obj = armature_obj.pose.bones.get(bone['name'])
+            if bone_obj:
+                mesh_obj.parent = armature_obj
+                mesh_obj.parent_bone = bone_obj.name
+                mesh_obj.parent_type = 'BONE'
+                # Adjust the origin by subtracting the Y-length of the bone tail
+                bone_tail_y = bone_obj.tail.y
+                mesh_obj.location.y -= bone_tail_y
+                #print(f"Mesh '{mesh_name}' parented to bone '{bone['name']}' with origin adjusted by tail length: {tail_length}")
+                return  # Mesh is assigned, no need to check further
+
 # Function to create and apply animations
 def create_animation(armature_obj, track_definitions, armature_data, model_prefix=prefix):
+    # Get the scene's frame rate
+    frame_rate = bpy.context.scene.render.fps
+
     # Group tracks by their animation key and model prefix
     animations_by_key = {}
 
     for animation_name, animation_data in track_definitions['animations'].items():
         # Use the stored animation prefix instead of extracting it
-        animation_key = animation_data.get('animation_prefix', animation_name[:3])  # Fallback to old method if prefix isn't found
+        animation_key = animation_data.get('animation_prefix', animation_name[:3])
+
+        # Ensure that animation_key is valid and of sufficient length
+        if not animation_key or len(animation_key) < 3:
+            print(f"Skipping invalid animation key for: {animation_name}")
+            continue
 
         # Use the correct action name
         action_name = f"{animation_key}_{model_prefix}"
@@ -261,12 +252,21 @@ def create_animation(armature_obj, track_definitions, armature_data, model_prefi
         armature_obj.animation_data_create()
         armature_obj.animation_data.action = action
         
-        fcurves = {}  # Initialize the fcurves dictionary
+        fcurves = {}
 
         # Go through each track in the animation data
         for track_data in tracks:
             track = track_data['definition']
-            track_instance_name = track_data['instance']['name']
+            track_instance = track_data['instance']
+            track_instance_name = track_instance['name']
+            sleep = track_instance.get('sleep', None)  # Sleep time in milliseconds, can be None
+
+            # Determine frames_per_sleep only if sleep is not None
+            frames_per_sleep = 1  # Default to 1 frame per keyframe
+            if sleep is not None:
+                frames_per_sleep = (sleep / 1000) * frame_rate
+
+            current_frame = 1  # Start from frame 1
 
             # Identify which bone this track belongs to
             for bone_name, bone in armature_obj.pose.bones.items():
@@ -298,7 +298,7 @@ def create_animation(armature_obj, track_definitions, armature_data, model_prefi
                     for frame_index, frame in enumerate(track['frame_transforms']):
                         # Retrieve the translation, rotation, and scale directly from the frame
                         location = frame.get('translation', [0, 0, 0])
-                        frame_rotation = Quaternion(frame.get('rotation', [1, 0, 0, 0]))
+                        frame_rotation = mathutils.Quaternion(frame.get('rotation', [1, 0, 0, 0]))
                         xyz_scale = track.get('xyz_scale', 256)
                         scale_factor = xyz_scale / 256.0
 
@@ -318,20 +318,23 @@ def create_animation(armature_obj, track_definitions, armature_data, model_prefi
                         # Insert location keyframes
                         for i, value in enumerate(translation):
                             fcurve = fcurves[bone_name]['location'][i]
-                            kf = fcurve.keyframe_points.insert(frame_index + 1, value)
+                            kf = fcurve.keyframe_points.insert(current_frame, value)
                             kf.interpolation = 'LINEAR'
 
                         # Insert rotation keyframes
                         for i, value in enumerate(rotation):
                             fcurve = fcurves[bone_name]['rotation_quaternion'][i]
-                            kf = fcurve.keyframe_points.insert(frame_index + 1, value)
+                            kf = fcurve.keyframe_points.insert(current_frame, value)
                             kf.interpolation = 'LINEAR'
 
                         # Insert scale keyframes
                         for i, value in enumerate(scale):
                             fcurve = fcurves[bone_name]['scale'][i]
-                            kf = fcurve.keyframe_points.insert(frame_index + 1, value)
+                            kf = fcurve.keyframe_points.insert(current_frame, value)
                             kf.interpolation = 'LINEAR'
+
+                        # Update current_frame based on frames_per_sleep (if sleep is None, it defaults to 1 frame per keyframe)
+                        current_frame += frames_per_sleep
 
 # Function to create a default pose
 def create_default_pose(armature_obj, track_definitions, armature_data, cumulative_matrices):
@@ -412,14 +415,15 @@ if armature_data and track_definitions:
     armature_tracks = track_definitions['armature_tracks']
     armature_obj, bone_map, cumulative_matrices = create_armature(armature_data, armature_tracks, main_obj)
     
-    # Create default pose based on the cumulative matrices
-    create_default_pose(armature_obj, track_definitions, armature_data, cumulative_matrices)
-    
     # Create meshes
     for mesh_data in meshes:
-        mesh_obj = create_mesh(mesh_data, main_obj, armature_obj, cumulative_matrices)
-    
-    # Pass armature_data to the create_animation function for further animations
+        mesh_obj = create_mesh(mesh_data, main_obj, armature_obj)
+        assign_mesh_to_armature(mesh_obj, armature_obj, armature_data, cumulative_matrices)
+
+    # Create default pose based on the cumulative matrices
+    create_default_pose(armature_obj, track_definitions, armature_data, cumulative_matrices)
+
+    # Create animations after parenting
     create_animation(armature_obj, track_definitions, armature_data)
 else:
     # If no armature data, just create meshes
