@@ -42,5 +42,5 @@ def create_polyhedron(polyhedron_data):
         obj.data.materials[0] = material
     else:
         obj.data.materials.append(material)
-    
+
     return obj
