@@ -18,7 +18,7 @@ from create_polyhedron import create_polyhedron
 from material_creator import create_materials  # Import the material creation function
 
 # Path to the text file
-file_path = r"C:\Users\dariu\Documents\Quail\chequip.quail\fro.mod"
+file_path = r"C:\Users\dariu\Documents\Quail\globalelf_chr.old.quail\elf.mod"
 
 # Get the base name for the main object
 base_name = os.path.splitext(os.path.basename(file_path))[0]
@@ -230,16 +230,9 @@ def create_animation(armature_obj, track_definitions, armature_data, model_prefi
     animations_by_key = {}
 
     for animation_name, animation_data in track_definitions['animations'].items():
-        # Use the stored animation prefix instead of extracting it
-        animation_key = animation_data.get('animation_prefix', animation_name[:3])
-
-        # Ensure that animation_key is valid and of sufficient length
-        if not animation_key or len(animation_key) < 3:
-            print(f"Skipping invalid animation key for: {animation_name}")
-            continue
-
-        # Use the correct action name
-        action_name = f"{animation_key}_{model_prefix}"
+        animation_key = animation_data.get('animation_prefix', animation_name[:3]).strip()
+        
+        action_name = f"{animation_key}_{model_prefix.strip()}"
 
         if action_name not in animations_by_key:
             animations_by_key[action_name] = []
@@ -249,9 +242,17 @@ def create_animation(armature_obj, track_definitions, armature_data, model_prefi
     # Create actions for each animation key
     for action_name, tracks in animations_by_key.items():
         action = bpy.data.actions.new(name=action_name)
-        armature_obj.animation_data_create()
-        armature_obj.animation_data.action = action
         
+        # Assign the action to the armature to ensure it has a user
+        if armature_obj.animation_data is None:
+            armature_obj.animation_data_create()
+        
+        # Set the created action to be the active action for the armature
+        armature_obj.animation_data.action = action
+
+        # Optional: Mark the action as having a "fake user" to keep it even if unassigned
+        action.use_fake_user = True  # This ensures the action will not be deleted even if it’s not actively used
+
         fcurves = {}
 
         # Go through each track in the animation data
@@ -259,91 +260,116 @@ def create_animation(armature_obj, track_definitions, armature_data, model_prefi
             track = track_data['definition']
             track_instance = track_data['instance']
             track_instance_name = track_instance['name']
-            sleep = track_instance.get('sleep', None)  # Sleep time in milliseconds, can be None
+            sleep = track_instance.get('sleep', None)
 
             # Determine frames_per_sleep only if sleep is not None
-            frames_per_sleep = 1  # Default to 1 frame per keyframe
+            frames_per_sleep = 1
             if sleep is not None:
                 frames_per_sleep = (sleep / 1000) * frame_rate
 
-            current_frame = 1  # Start from frame 1
+            current_frame = 1
+
+            # Strip the animation prefix and '_TRACK' from the track instance name
+            stripped_track_instance_name = track_instance_name[len(animation_key):].replace('_TRACK', '')
 
             # Identify which bone this track belongs to
-            for bone_name, bone in armature_obj.pose.bones.items():
-                # Strip '_DAG' from the bone name
-                stripped_bone_name = bone_name.replace('_DAG', '')
+            bone_name = None
+            for bone in armature_obj.pose.bones:
+                stripped_bone_name = bone.name.replace('_DAG', '')
 
-                # Strip the animation prefix and '_TRACK' from the track instance name
-                stripped_track_instance_name = track_instance_name[len(animation_key):].replace('_TRACK', '')
-
-                # Compare the stripped names
                 if stripped_bone_name == stripped_track_instance_name:
-                    # Initialize FCurves if they don't exist
-                    if bone_name not in fcurves:
-                        fcurves[bone_name] = {
-                            'location': [],
-                            'rotation_quaternion': [],
-                            'scale': []  # Add scale fcurves
-                        }
+                    bone_name = bone.name
+                    break
+                elif bone.name.replace('_ANIDAG', '') == stripped_track_instance_name:
+                    bone_name = bone.name
+                    break
 
-                        # Create fcurves for location, rotation_quaternion, and scale
-                        for i in range(3):  # Location and Scale have 3 components: X, Y, Z
-                            fcurves[bone_name]['location'].append(action.fcurves.new(data_path=f'pose.bones["{bone_name}"].location', index=i))
-                            fcurves[bone_name]['scale'].append(action.fcurves.new(data_path=f'pose.bones["{bone_name}"].scale', index=i))
+            if not bone_name:
+                # Create new animation-only bone with "_ANIDAG"
+                bpy.ops.object.mode_set(mode='EDIT')
+                parent_bone_name = stripped_track_instance_name[:-1] + '_DAG'
+                parent_bone = armature_obj.data.edit_bones.get(parent_bone_name)
 
-                        for i in range(4):  # Rotation quaternion has 4 components: W, X, Y, Z
-                            fcurves[bone_name]['rotation_quaternion'].append(action.fcurves.new(data_path=f'pose.bones["{bone_name}"].rotation_quaternion', index=i))
+                if parent_bone:
+                    anim_bone_name = f"{stripped_track_instance_name}_ANIDAG"
+                    anim_bone = armature_obj.data.edit_bones.new(anim_bone_name)
+                    anim_bone.head = parent_bone.tail
+                    anim_bone.tail = anim_bone.head + mathutils.Vector((0, 0.1, 0))
+                    anim_bone.parent = parent_bone
+                    bpy.ops.object.mode_set(mode='OBJECT')
 
-                    # Insert keyframes for each frame
-                    for frame_index, frame in enumerate(track['frame_transforms']):
-                        # Retrieve the translation, rotation, and scale directly from the frame
-                        location = frame.get('translation', [0, 0, 0])
-                        frame_rotation = mathutils.Quaternion(frame.get('rotation', [1, 0, 0, 0]))
-                        xyz_scale = track.get('xyz_scale', 256)
-                        scale_factor = xyz_scale / 256.0
+                    # After creating the animation bone, retry matching
+                    for bone in armature_obj.pose.bones:
+                        stripped_bone_name = bone.name.replace('_ANIDAG', '')
+                        if stripped_bone_name == stripped_track_instance_name:
+                            bone_name = bone.name
+                            break
 
-                        # Create matrices for translation, rotation, and scale
-                        scale_matrix = mathutils.Matrix.Scale(scale_factor, 4)
-                        rotation_matrix = frame_rotation.to_matrix().to_4x4()
-                        translation_matrix = mathutils.Matrix.Translation(location)
+            if bone_name:
+                if bone_name not in fcurves:
+                    fcurves[bone_name] = {
+                        'location': [],
+                        'rotation_quaternion': [],
+                        'scale': []
+                    }
 
-                        # Combine the matrices in the correct order: Translation * Rotation * Scale
-                        bone_matrix = translation_matrix @ rotation_matrix @ scale_matrix
+                    for i in range(3):
+                        fcurves[bone_name]['location'].append(action.fcurves.new(data_path=f'pose.bones["{bone_name}"].location', index=i))
+                        fcurves[bone_name]['scale'].append(action.fcurves.new(data_path=f'pose.bones["{bone_name}"].scale', index=i))
 
-                        # Extract translation, rotation, and scale from the matrix
-                        translation = bone_matrix.to_translation()
-                        rotation = bone_matrix.to_quaternion()
-                        scale = [scale_factor] * 3  # Apply the scaling factor
+                    for i in range(4):
+                        fcurves[bone_name]['rotation_quaternion'].append(action.fcurves.new(data_path=f'pose.bones["{bone_name}"].rotation_quaternion', index=i))
 
-                        # Insert location keyframes
-                        for i, value in enumerate(translation):
-                            fcurve = fcurves[bone_name]['location'][i]
-                            kf = fcurve.keyframe_points.insert(current_frame, value)
-                            kf.interpolation = 'LINEAR'
+                for frame_index, frame in enumerate(track['frame_transforms']):
+                    location = frame.get('translation', [0, 0, 0])
+                    frame_rotation = mathutils.Quaternion(frame.get('rotation', [1, 0, 0, 0]))
+                    xyz_scale = track.get('xyz_scale', 256)
+                    scale_factor = xyz_scale / 256.0
 
-                        # Insert rotation keyframes
-                        for i, value in enumerate(rotation):
-                            fcurve = fcurves[bone_name]['rotation_quaternion'][i]
-                            kf = fcurve.keyframe_points.insert(current_frame, value)
-                            kf.interpolation = 'LINEAR'
+                    scale_matrix = mathutils.Matrix.Scale(scale_factor, 4)
+                    rotation_matrix = frame_rotation.to_matrix().to_4x4()
+                    translation_matrix = mathutils.Matrix.Translation(location)
 
-                        # Insert scale keyframes
-                        for i, value in enumerate(scale):
-                            fcurve = fcurves[bone_name]['scale'][i]
-                            kf = fcurve.keyframe_points.insert(current_frame, value)
-                            kf.interpolation = 'LINEAR'
+                    bone_matrix = translation_matrix @ rotation_matrix @ scale_matrix
 
-                        # Update current_frame based on frames_per_sleep (if sleep is None, it defaults to 1 frame per keyframe)
-                        current_frame += frames_per_sleep
+                    translation = bone_matrix.to_translation()
+                    rotation = bone_matrix.to_quaternion()
+                    scale = [scale_factor] * 3
+
+                    for i, value in enumerate(translation):
+                        fcurve = fcurves[bone_name]['location'][i]
+                        kf = fcurve.keyframe_points.insert(current_frame, value)
+                        kf.interpolation = 'LINEAR'
+
+                    for i, value in enumerate(rotation):
+                        fcurve = fcurves[bone_name]['rotation_quaternion'][i]
+                        kf = fcurve.keyframe_points.insert(current_frame, value)
+                        kf.interpolation = 'LINEAR'
+
+                    for i, value in enumerate(scale):
+                        fcurve = fcurves[bone_name]['scale'][i]
+                        kf = fcurve.keyframe_points.insert(current_frame, value)
+                        kf.interpolation = 'LINEAR'
+
+                    current_frame += frames_per_sleep
+
+    print("Animation creation complete")
 
 # Function to create a default pose
 def create_default_pose(armature_obj, track_definitions, armature_data, cumulative_matrices):
     # Create a default pose action
     action_name = f"POS_{prefix}"
     action = bpy.data.actions.new(name=action_name)
-    armature_obj.animation_data_create()
-    armature_obj.animation_data.action = action
-    
+
+    # Ensure the armature has animation data and assign the action
+    if armature_obj.animation_data is None:
+        armature_obj.animation_data_create()
+
+    armature_obj.animation_data.action = action  # Assign the action to the armature
+
+    # Optional: Mark the action as having a "fake user" to keep it even if not actively used
+    action.use_fake_user = True  # This ensures the action will not be deleted
+
     fcurves = {}  # Initialize the fcurves dictionary
 
     # Loop through the bones in the armature and create default pose keyframes
@@ -365,7 +391,7 @@ def create_default_pose(armature_obj, track_definitions, armature_data, cumulati
             scale_matrix = mathutils.Matrix.Scale(scale_factor, 4)
             rotation_matrix = armature_rotation.to_matrix().to_4x4()
             translation_matrix = mathutils.Matrix.Translation(armature_translation)
-            
+
             # Combine the matrices in the correct order: Translation * Rotation * Scale * Cumulative Matrix
             bone_matrix = translation_matrix @ rotation_matrix @ scale_matrix @ cumulative_matrices.get(bone_name, mathutils.Matrix.Identity(4))
 
