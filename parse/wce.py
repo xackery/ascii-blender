@@ -1,15 +1,18 @@
 from model.track_def import *
 from model.track import *
+from model.world_def import *
 import shlex
 import os
 
 class wce:
     track_defs:list[track_def]
     tracks:list[track]
+    world:world_def
 
     def __init__(self):
         self.track_defs = []
         self.tracks = []
+        self.world = None
 
     def parse_definitions(self, current_path:str, r:io.TextIOWrapper):
         current_dir = os.path.dirname(current_path)
@@ -133,19 +136,18 @@ class wce:
                 except Exception as e:
                      raise Exception(f"track_def: {e}")
                 continue
-            #         return err
-            #     continue
             if line.startswith("TRACKINSTANCE"):
                 try:
                     self.tracks.append(track(records[1], r))
                 except Exception as e:
                      raise Exception(f"track: {e}")
                 continue
-            # if line.startswith("WORLDDEF"):
-            #     parse_worlddef(r)
-            #     if err:
-            #         return err
-            #     continue
+            if line.startswith("WORLDDEF"):
+                try:
+                    self.world = world_def(r)
+                except Exception as e:
+                    raise Exception(f"world_def: {e}")
+                continue
             # if line.startswith("WORLDTREE"):
             #     parse_worldtree(r)
             #     if err:
